@@ -9,7 +9,6 @@ use defmt;
 use defmt_rtt as _;
 use embedded_graphics::prelude::*;
 use embedded_hal::digital::OutputPin;
-use embedded_hal::delay::DelayNs;
 use embedded_hal_bus::spi::ExclusiveDevice;
 use epd_waveshare::{
     epd1in02::{Epd1in02, Display1in02},
@@ -19,7 +18,7 @@ use fixed::types::*;
 use hal::{
     gpio::{gpioa, gpioa::PA, Analog, Input, PullDown, OpenDrain, Output, PushPull, PB7, PB6, PA5, PA7},
     i2c::{Config, I2c},
-    pac::{SPI1, TIM16, TIM17, I2C1, TIM14},
+    pac::{SPI1, TIM3, TIM16, TIM17, I2C1, TIM14},
     prelude::*,
     power::{PowerMode, LowPowerMode},
     rcc,
@@ -31,15 +30,11 @@ use hal::{
 use inverted_pin::InvertedPin;
 use panic_probe as _;
 // use panic_halt as _;
-use rtic_monotonics::systick::prelude::*;
 use sht4x::{Sht4x, Precision};
 use stm32g0xx_hal as hal;
 use u8g2_fonts::{fonts, types::*, FontRenderer};
 
 use g031_sht40::deactivate::DeactivatedEpdPins;
-
-
-systick_monotonic!(Mono, 1000);
 
 
 #[rtic::app(device = hal::pac, peripherals = true, dispatchers = [EXTI0_1])]
@@ -67,7 +62,7 @@ mod app {
         en_epd: gpioa::PA<Output<PushPull>>,
         rcc: rcc::Rcc,
         rtc: Rtc,
-        // led: gpioa::PA<Output<PushPull>>,
+        delay: Delay<TIM3>,
     }
 
     #[init]
@@ -75,11 +70,6 @@ mod app {
 
         // Configure clock to 1MHz
         let mut rcc = cx.device.RCC.freeze(rcc::Config::hsi(rcc::Prescaler::Div16));
-
-        Mono::start(cx.core.SYST, rcc.clocks.sys_clk.to_Hz());
-        // TODO: Fix: for unknown reason the first Mono activation takes above ten seconds
-        // At least let it happen when nothing is still started
-        Mono.delay_ms(1);
 
         let gpioa = cx.device.GPIOA.split(&mut rcc);
         let gpiob = cx.device.GPIOB.split(&mut rcc);
@@ -145,6 +135,9 @@ mod app {
         let sensor: Sensor = Sht4x::new(i2c);
         let sensor_delay = cx.device.TIM14.delay(&mut rcc);
 
+        // Delay
+        let delay = cx.device.TIM3.delay(&mut rcc);
+
         // RTC
         let date = Date::new(Year(0), Month(0), MonthDay(0));
         // Every time as seconds value turns 10
@@ -179,17 +172,17 @@ mod app {
                 en_epd,
                 rcc,
                 rtc,
-                // led,
+                delay,
             },
         )
     }
 
 
-    #[task(local = [epd, spi_dev, epd_delay, sensor, sensor_delay, en_sensor, en_epd, rcc], priority = 1)]
+    #[task(local = [epd, spi_dev, epd_delay, sensor, sensor_delay, en_sensor, en_epd, rcc, delay], priority = 1)]
     async fn main_task(cx: main_task::Context) {
 
         let main_task::LocalResources
-            {epd, spi_dev, epd_delay, sensor, sensor_delay, en_sensor, en_epd, rcc, ..} = cx.local;
+            {epd, spi_dev, epd_delay, sensor, sensor_delay, en_sensor, en_epd, rcc, delay, ..} = cx.local;
 
         let mut frame = Display1in02::default();
         frame.set_rotation(DisplayRotation::Rotate180);
@@ -206,8 +199,7 @@ mod app {
 
             en_sensor.set_high().ok();
             // Delay after switching sensor on
-            // Mono::delay doesn't work because of higher priority interrupt preventing wakeup
-            Mono.delay_ms(2);
+            delay.delay(2.millis());
             let measurement = sensor.measure(Precision::High, sensor_delay);
             en_sensor.set_low().ok();
 
