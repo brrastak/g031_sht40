@@ -16,22 +16,16 @@ use epd_waveshare::{
     prelude::*
 };
 use fixed::types::*;
-// use hal::{
-//     clocks::Clock,
-//     fugit::RateExtU32,
-//     gpio,
-//     spi,
-//     rtc,
-//     Sio,
-// };
-// use inverted_pin::InvertedPin;
 use hal::{
-    gpio::{gpioa, gpioa::PA, Analog, Input, PullUp, PullDown, OpenDrain, Output, PushPull, PB7, PB6, PA5, PA7},
+    gpio::{gpioa, gpioa::PA, Analog, Input, PullDown, OpenDrain, Output, PushPull, PB7, PB6, PA5, PA7},
     i2c::{Config, I2c},
     pac::{SPI1, TIM16, TIM17, I2C1, TIM14},
     prelude::*,
+    power::{PowerMode, LowPowerMode},
     rcc,
+    rtc::{Alarm, Event, Rtc},
     spi::{self, Mode, Phase, Polarity, SpiBus, NoMiso},
+    time::{Date, Year, Month, MonthDay},
     timer::delay::Delay,
 };
 use inverted_pin::InvertedPin;
@@ -42,7 +36,7 @@ use sht4x::{Sht4x, Precision};
 use stm32g0xx_hal as hal;
 use u8g2_fonts::{fonts, types::*, FontRenderer};
 
-use g031_sht40::deactivate::{ActivatedEpdPins, DeactivatedEpdPins};
+use g031_sht40::deactivate::DeactivatedEpdPins;
 
 
 systick_monotonic!(Mono, 1000);
@@ -67,12 +61,13 @@ mod app {
         epd: Epd,
         spi_dev: SpiDev,
         epd_delay: Delay<TIM16>,
-        // rtc: rtc::RealTimeClock,
         sensor: Sensor,
         sensor_delay: Delay<TIM14>,
         en_sensor: InvertedPin<gpioa::PA<Output<OpenDrain>>>,
         en_epd: gpioa::PA<Output<PushPull>>,
         rcc: rcc::Rcc,
+        rtc: Rtc,
+        // led: gpioa::PA<Output<PushPull>>,
     }
 
     #[init]
@@ -150,36 +145,26 @@ mod app {
         let sensor: Sensor = Sht4x::new(i2c);
         let sensor_delay = cx.device.TIM14.delay(&mut rcc);
 
-        // // Prepare the RTC for the example using the 1/1/0 (Day/Month/Year) at 0:00:00 as the initial
-        // // day and time (it may not have been a Monday but it doesn't matter for this example.).
-        // let mut rtc = hal::rtc::RealTimeClock::new(
-        //     cx.device.RTC,
-        //     clocks.rtc_clock,
-        //     &mut resets,
-        //     rtc::DateTime {
-        //         year: 0,
-        //         month: 1,
-        //         day: 1,
-        //         day_of_week: rtc::DayOfWeek::Monday,
-        //         hour: 0,
-        //         minute: 0,
-        //         second: 0,
-        //     },
-        // )
-        // .unwrap();
+        // RTC
+        let date = Date::new(Year(0), Month(0), MonthDay(0));
+        // Every time as seconds value turns 10
+        let alarm = Alarm::new().set_seconds(10);
+        let mut rtc = cx.device.RTC.constrain(&mut rcc);
+        rtc.set_date(&date);
+        rtc.set_alarm_a(alarm);
+        rtc.listen(Event::AlarmA);
 
-        // // Trigger the IRQ once a minute
-        // rtc.schedule_alarm(rtc::DateTimeFilter::default().second(0));
-        // rtc.enable_interrupt();
-
-        // // Let the core enter deep-sleep while waiting on wfi
-        // let mut scb = cx.core.SCB;
-        // scb.set_sleepdeep();
+        // Let the core enter deep-sleep while waiting on wfi
+        let mut power = cx.device.PWR.constrain(&mut rcc);
+        power.set_mode(PowerMode::UltraLowPower(LowPowerMode::StopMode2));
+        let mut scb = cx.core.SCB;
+        scb.set_sleepdeep();
+        cortex_m::asm::wfi();
         
+
         defmt::info!("Initialization finished!");
 
         main_task::spawn().ok();
-        // heartbeat::spawn().ok();
 
         (
             Shared {},
@@ -193,6 +178,8 @@ mod app {
                 en_sensor,
                 en_epd,
                 rcc,
+                rtc,
+                // led,
             },
         )
     }
@@ -219,7 +206,8 @@ mod app {
 
             en_sensor.set_high().ok();
             // Delay after switching sensor on
-            Mono::delay(2.millis()).await;
+            // Mono::delay doesn't work because of higher priority interrupt preventing wakeup
+            Mono.delay_ms(2);
             let measurement = sensor.measure(Precision::High, sensor_delay);
             en_sensor.set_low().ok();
 
@@ -230,8 +218,7 @@ mod app {
                     defmt::info!("Temperature: {}°C Humidity: {}%", temperature, humidity);
                     // if temperature == prev_temperature && humidity == prev_humidity {
 
-                    //     // hw_config::sleep();
-                    //     Mono::delay(5000.millis()).await;
+                    //     cortex_m::asm::wfi();
                     //     continue;
                     // }
 
@@ -275,35 +262,19 @@ mod app {
             en_epd.set_low().ok();
             epd_pins = activated_epd_pins.deactivate();
 
-            Mono::delay(10.secs()).await;
-            // hw_config::sleep();
+            cortex_m::asm::wfi();
         }
     }
 
 
-    // #[task(binds = RTC_IRQ, local = [rtc], priority = 2)]
-    // fn wake_up(cx: wake_up::Context) {
+    #[task(binds = RTC_TAMP, local = [rtc], priority = 2)]
+    fn wake_up(cx: wake_up::Context) {
 
-    //     let wake_up::LocalResources
-    //         {rtc, ..} = cx.local;
+        let wake_up::LocalResources
+            {rtc, ..} = cx.local;
 
-    //     rtc.clear_interrupt();
-    // }
-
-
-    // Blink on-board LED
-    // #[task(local = [led], priority = 1)]
-    // async fn heartbeat(cx: heartbeat::Context) {
-
-    //     let heartbeat::LocalResources
-    //         {led, ..} = cx.local;
-
-    //     loop {
-    //         led.toggle().ok();
-    //         defmt::info!("Blink!");
-    //         Mono::delay(1000.millis()).await;
-    //     }
-    // }
+        rtc.unpend(Event::AlarmA);
+    }
 
 
     #[idle]
