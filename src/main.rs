@@ -2,7 +2,6 @@
 #![no_main]
 #![no_std]
 
-
 use cortex_m::singleton;
 use defmt;
 // Global logger
@@ -11,42 +10,51 @@ use embedded_graphics::prelude::*;
 use embedded_hal::digital::OutputPin;
 use embedded_hal_bus::spi::ExclusiveDevice;
 use epd_waveshare::{
-    epd1in02::{Epd1in02, Display1in02},
-    prelude::*
+    epd1in02::{Display1in02, Epd1in02},
+    prelude::*,
 };
 use fixed::types::*;
 use hal::{
-    gpio::{gpioa, gpioa::PA, Analog, Input, PullDown, OpenDrain, Output, PushPull, PB7, PB6, PA5, PA7},
+    gpio::{
+        Analog, Input, OpenDrain, Output, PA5, PA7, PB6, PB7, PullDown, PushPull, gpioa, gpioa::PA,
+    },
     i2c::{Config, I2c},
-    pac::{SPI1, TIM3, TIM16, TIM17, I2C1, TIM14},
+    pac::{I2C1, SPI1, TIM3, TIM14, TIM16, TIM17},
+    power::{LowPowerMode, PowerMode},
     prelude::*,
-    power::{PowerMode, LowPowerMode},
     rcc,
     rtc::{Alarm, Event, Rtc},
-    spi::{self, Mode, Phase, Polarity, SpiBus, NoMiso},
-    time::{Date, Year, Month, MonthDay},
+    spi::{self, Mode, NoMiso, Phase, Polarity, SpiBus},
+    time::{Date, Month, MonthDay, Year},
     timer::delay::Delay,
 };
 use inverted_pin::InvertedPin;
 use panic_probe as _;
-// use panic_halt as _;
-use sht4x::{Sht4x, Precision};
+use sht4x::{Precision, Sht4x};
 use stm32g0xx_hal as hal;
-use u8g2_fonts::{fonts, types::*, FontRenderer};
+use u8g2_fonts::{FontRenderer, fonts, types::*};
 
 use g031_sht40::deactivate::DeactivatedEpdPins;
-
 
 #[rtic::app(device = hal::pac, peripherals = true, dispatchers = [EXTI0_1])]
 mod app {
 
     use super::*;
 
-
-    type SpiDev = ExclusiveDevice<SpiBus<SPI1, (PA5<Analog>, NoMiso, PA7<Analog>)>, PA<Output<PushPull>>, &'static mut Delay<TIM17>>;
-    type Epd = Epd1in02<SpiDev, PA<Input<PullDown>>, PA<Output<PushPull>>, PA<Output<PushPull>>, Delay<TIM16>>;
-    type Sensor = sht4x::Sht4x<I2c<I2C1, PB7<Output<OpenDrain>>, PB6<Output<OpenDrain>>>, Delay<TIM14>>;
-
+    type SpiDev = ExclusiveDevice<
+        SpiBus<SPI1, (PA5<Analog>, NoMiso, PA7<Analog>)>,
+        PA<Output<PushPull>>,
+        &'static mut Delay<TIM17>,
+    >;
+    type Epd = Epd1in02<
+        SpiDev,
+        PA<Input<PullDown>>,
+        PA<Output<PushPull>>,
+        PA<Output<PushPull>>,
+        Delay<TIM16>,
+    >;
+    type Sensor =
+        sht4x::Sht4x<I2c<I2C1, PB7<Output<OpenDrain>>, PB6<Output<OpenDrain>>>, Delay<TIM14>>;
 
     #[shared]
     struct Shared {}
@@ -67,16 +75,20 @@ mod app {
 
     #[init]
     fn init(cx: init::Context) -> (Shared, Local) {
-
         // Configure clock to 1MHz
-        let mut rcc = cx.device.RCC.freeze(rcc::Config::hsi(rcc::Prescaler::Div16));
+        let mut rcc = cx
+            .device
+            .RCC
+            .freeze(rcc::Config::hsi(rcc::Prescaler::Div16));
 
         let gpioa = cx.device.GPIOA.split(&mut rcc);
         let gpiob = cx.device.GPIOB.split(&mut rcc);
-        // let led = gpioa.pa4.into_push_pull_output().downgrade();
 
         // Epd display
-        let mut en_epd = gpioa.pa0.into_push_pull_output_in_state(PinState::High).downgrade();
+        let mut en_epd = gpioa
+            .pa0
+            .into_push_pull_output_in_state(PinState::High)
+            .downgrade();
         let epd_busy = gpioa.pa3.into_pull_down_input().downgrade();
         let epd_reset = gpioa.pa2.into_push_pull_output().downgrade();
         let epd_dc = gpioa.pa8.into_push_pull_output().downgrade();
@@ -98,13 +110,10 @@ mod app {
         spi.half_duplex_output_enable(true);
 
         let tim17 = cx.device.TIM17;
-        let spi_delay: &'static mut _ = singleton!(: hal::timer::delay::Delay<hal::pac::TIM17> = tim17.delay(&mut rcc)).unwrap();
-        let mut spi_dev = ExclusiveDevice::new(
-            spi,
-            epd_cs,
-            spi_delay
-        )
-        .expect("SpiDevice error");
+        let spi_delay: &'static mut _ =
+            singleton!(: hal::timer::delay::Delay<hal::pac::TIM17> = tim17.delay(&mut rcc))
+                .unwrap();
+        let mut spi_dev = ExclusiveDevice::new(spi, epd_cs, spi_delay).expect("SpiDevice error");
 
         en_epd.set_high().ok();
         let mut epd_delay = cx.device.TIM16.delay(&mut rcc);
@@ -114,22 +123,28 @@ mod app {
             epd_dc,
             epd_reset,
             &mut epd_delay,
-            None
+            None,
         )
         .expect("Epd init error");
-        epd.clear_frame(&mut spi_dev, &mut epd_delay).expect("Epd error");
-        epd.display_frame(&mut spi_dev, &mut epd_delay).expect("Epd error");
+        epd.clear_frame(&mut spi_dev, &mut epd_delay)
+            .expect("Epd error");
+        epd.display_frame(&mut spi_dev, &mut epd_delay)
+            .expect("Epd error");
         epd.sleep(&mut spi_dev, &mut epd_delay).expect("Epd error");
         en_epd.set_low().ok();
-        
+
         let _ = DeactivatedEpdPins::steal_epd_pins(&mut rcc);
 
         // Sht40 sensor
-        let en_sensor = gpioa.pa12.into_open_drain_output_in_state(PinState::High).downgrade();
+        let en_sensor = gpioa
+            .pa12
+            .into_open_drain_output_in_state(PinState::High)
+            .downgrade();
         let en_sensor = InvertedPin::new(en_sensor);
         let sda = gpiob.pb7.into_open_drain_output_in_state(PinState::High);
         let scl = gpiob.pb6.into_open_drain_output_in_state(PinState::High);
-        let i2c = cx.device
+        let i2c = cx
+            .device
             .I2C1
             .i2c(sda, scl, Config::new(100.kHz()), &mut rcc);
         let sensor: Sensor = Sht4x::new(i2c);
@@ -153,7 +168,6 @@ mod app {
         let mut scb = cx.core.SCB;
         scb.set_sleepdeep();
         cortex_m::asm::wfi();
-        
 
         defmt::info!("Initialization finished!");
 
@@ -177,16 +191,24 @@ mod app {
         )
     }
 
-
     #[task(local = [epd, spi_dev, epd_delay, sensor, sensor_delay, en_sensor, en_epd, rcc, delay], priority = 1)]
     async fn main_task(cx: main_task::Context) {
-
-        let main_task::LocalResources
-            {epd, spi_dev, epd_delay, sensor, sensor_delay, en_sensor, en_epd, rcc, delay, ..} = cx.local;
+        let main_task::LocalResources {
+            epd,
+            spi_dev,
+            epd_delay,
+            sensor,
+            sensor_delay,
+            en_sensor,
+            en_epd,
+            rcc,
+            delay,
+            ..
+        } = cx.local;
 
         let mut frame = Display1in02::default();
         frame.set_rotation(DisplayRotation::Rotate180);
-        
+
         let font = FontRenderer::new::<fonts::u8g2_font_logisoso24_tf>();
 
         let mut prev_temperature = I16F16::ZERO;
@@ -217,17 +239,13 @@ mod app {
                     prev_temperature = temperature;
                     prev_humidity = humidity;
 
-                    format_no_std::show(
-                        &mut buf,
-                        format_args!("{}°C\n{}%",
-                            temperature,
-                            humidity,
-                        )).unwrap()
-                },
+                    format_no_std::show(&mut buf, format_args!("{}°C\n{}%", temperature, humidity,))
+                        .unwrap()
+                }
                 Err(_) => {
                     defmt::info!("Sensor reading error");
                     "Error"
-                },
+                }
             };
 
             // Render a message
@@ -247,8 +265,7 @@ mod app {
             let activated_epd_pins = epd_pins.reactivate();
             en_epd.set_high().ok();
             epd.wake_up(spi_dev, epd_delay).expect("Epd error");
-            epd
-                .update_and_display_frame(spi_dev, frame.buffer(), epd_delay)
+            epd.update_and_display_frame(spi_dev, frame.buffer(), epd_delay)
                 .expect("Epd error");
             epd.sleep(spi_dev, epd_delay).expect("Epd error");
             en_epd.set_low().ok();
@@ -258,37 +275,27 @@ mod app {
         }
     }
 
-
     #[task(binds = RTC_TAMP, local = [rtc], priority = 2)]
     fn wake_up(cx: wake_up::Context) {
-
-        let wake_up::LocalResources
-            {rtc, ..} = cx.local;
+        let wake_up::LocalResources { rtc, .. } = cx.local;
 
         rtc.unpend(Event::AlarmA);
     }
 
-
     #[idle]
     fn idle(_: idle::Context) -> ! {
-
         loop {
             cortex_m::asm::wfi();
         }
     }
 }
 
-
 fn decode_sensor_data(measurement: sht4x::Measurement) -> (I16F16, I16F16) {
-
     // Keep one decimal digit in a fractional part
-    let temperature = measurement
-        .temperature_celsius() * 10;
+    let temperature = measurement.temperature_celsius() * 10;
     let temperature = temperature.round() / 10;
 
-    let humidity = measurement
-        .humidity_percent()
-        .round();
+    let humidity = measurement.humidity_percent().round();
 
     (temperature, humidity)
 }

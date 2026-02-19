@@ -15,12 +15,8 @@ epd-waveshare = "0.6.0"
 fixed = {version = "1.30.0", features = ["defmt"]}
 format_no_std = "1.2.0"
 inverted-pin = "1.0.0"
-panic-halt = "1.0.0"
 panic-probe = {version = "1.0.0", features = ["print-defmt"]}
-# For rtic-monotonics
-portable-atomic = {version = "1.13.0", features = ["critical-section"]}
 rtic = {version = "2.2.0", features = ["thumbv6-backend"]}
-rtic-monotonics = {version = "2.1.0", features = ["cortex-m-systick"]}
 sht4x = "0.2.0"
 stm32g0xx-hal = {version = "0.2.0", features = ["stm32g031", "rt"]}
 u8g2-fonts = "0.7.2"
