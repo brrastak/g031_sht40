@@ -28,6 +28,11 @@ epd-waveshare = {git = "https://github.com/caemor/epd-waveshare.git", branch = "
 # For fixed SPI write
 stm32g0xx-hal = {git = "https://github.com/brrastak/stm32g0xx-hal.git", branch = "spi_write_end"}
 
+
+[dev-dependencies]
+pretty_assertions = "1.4.1"
+
+
 # Set the default for dependencies.
 [profile.dev.package."*"]
 opt-level = "s"
