@@ -62,7 +62,6 @@ impl Data {
                     (true, true) => UpdateStatus::UpdateBoth,
                 }
             },
-            (None, None) => UpdateStatus::NoUpdate,
             _ => UpdateStatus::UpdateBoth,
         }
     }
@@ -153,7 +152,7 @@ mod tests {
     fn handle_none() {
         let prev = Data(None);
         let new = Data(None);
-        assert_eq!(new.check_update(&prev), UpdateStatus::NoUpdate);
+        assert_eq!(new.check_update(&prev), UpdateStatus::UpdateBoth);
     }
 
     #[test]
