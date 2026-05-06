@@ -1,5 +1,7 @@
+//! Board Support Package: hardware related stuff, like pin configuration, sensor and display initialization, etc.
 
 use cortex_m::singleton;
+use embedded_graphics::prelude::*;
 use embedded_hal_bus::spi::ExclusiveDevice;
 use epd_waveshare::{
     epd1in02::{Display1in02, Epd1in02},
@@ -22,6 +24,10 @@ use hal::{
 use inverted_pin::InvertedPin;
 use sht4x::{Precision, Sht4x};
 use stm32g0xx_hal as hal;
+use u8g2_fonts::{FontRenderer, fonts, types::*};
+
+use crate::data::Data;
+use crate::deactivate::DeactivatedEpdPins;
 
 
 type SpiDev = ExclusiveDevice<
@@ -38,6 +44,7 @@ type Epd = Epd1in02<
 >;
 type Sht =
     sht4x::Sht4x<I2c<I2C1, PB7<Output<OpenDrain>>, PB6<Output<OpenDrain>>>, Delay<TIM14>>;
+type Frame = epd_waveshare::graphics::Display<80, 128, false, 1280, Color>;
 
 pub struct Sensor {
     sensor: Sht,
@@ -51,12 +58,13 @@ pub struct Display {
     en_epd: gpioa::PA<Output<PushPull>>,
     spi_dev: SpiDev,
     epd_delay: Delay<TIM16>,
+    /// For DeactivatedEpdPins
+    pub rcc: rcc::Rcc,
 }
 
 pub struct Board {
     pub display: Display,
     pub sensor: Sensor,
-    pub rcc: rcc::Rcc,
     pub rtc: Rtc,
 }
 
@@ -169,13 +177,74 @@ impl Board {
             en_epd,
             spi_dev,
             epd_delay,
+            rcc,
         };
         
         Board {
             display,
             sensor,
-            rcc,
             rtc,
         }
+    }
+}
+
+impl Sensor {
+    
+    pub fn read(&mut self) -> Data {
+
+        self.en_sensor.set_high().ok();
+        // Delay after switching sensor on
+        self.extern_delay.delay(2.millis());
+        let measurement = self.sensor.measure(Precision::High, &mut self.inner_delay);
+        self.en_sensor.set_low().ok();
+
+        Data::from_sensor_measurement(measurement)
+    }
+}
+
+impl Display {
+    
+    pub fn full_update(&mut self, data: &Data) {
+
+        let frame = self.render(data);
+
+        // Reactivate previously deactivated pins (ref. the second comment)
+        let epd_pins = DeactivatedEpdPins::steal_epd_pins(&mut self.rcc);
+        let activated_epd_pins = epd_pins.reactivate();
+
+        self.en_epd.set_high().ok();
+        self.epd.wake_up(&mut self.spi_dev, &mut self.epd_delay).expect("EPD error");
+        self.epd.update_and_display_frame(&mut self.spi_dev, frame.buffer(), &mut self.epd_delay)
+            .expect("EPD error");
+        self.epd.sleep(&mut self.spi_dev, &mut self.epd_delay).expect("EPD error");
+        self.en_epd.set_low().ok();
+
+        // Deactive all EPD-related pins to decrease power consumption during sleep mode
+        _ = activated_epd_pins.deactivate();
+    }
+
+    fn render(&mut self, data: &Data) -> Frame {
+
+        let mut frame = Display1in02::default();
+        frame.set_rotation(DisplayRotation::Rotate180);
+
+        let font = FontRenderer::new::<fonts::u8g2_font_logisoso24_tf>();
+
+        let mut buf = [0u8; 40];
+        let message = data.format_into_str(&mut buf);
+
+        frame.clear(self.epd.background_color().clone()).ok();
+        font.render_aligned(
+            message,
+            frame.bounding_box().center(),
+            VerticalPosition::Center,
+            HorizontalAlignment::Center,
+            // Inversed color works with both light and dark background
+            FontColor::Transparent(self.epd.background_color().inverse()),
+            &mut frame,
+        )
+        .expect("Render error");
+
+        frame
     }
 }
