@@ -43,6 +43,8 @@ mod app {
 
         let prev_data = Data::empty();
 
+        system_task::spawn().ok();
+
         (
             Shared {},
             Local {

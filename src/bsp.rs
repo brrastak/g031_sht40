@@ -126,13 +126,9 @@ impl Board {
             None,
         )
         .expect("Epd init error");
-        epd.clear_frame(&mut spi_dev, &mut epd_delay)
-            .expect("Epd error");
-        epd.display_frame(&mut spi_dev, &mut epd_delay)
-            .expect("Epd error");
         epd.sleep(&mut spi_dev, &mut epd_delay).expect("Epd error");
         en_epd.set_low().ok();
-        // Without that power consumption in ~50mA
+        // Without that power consumption is ~50mA
         let _ = DeactivatedEpdPins::steal_epd_pins(&mut rcc);
 
         // Sht40 sensor
