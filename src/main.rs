@@ -87,7 +87,14 @@ mod app {
 
         rtc.unpend(rtc::Event::AlarmA);
 
-        system_task::spawn().ok();
+        let time = rtc.get_time();
+        defmt::info!("Wake up! Time: {}:{}:{}", time.hours, time.minutes, time.seconds);
+
+        let update_period_minutes = 5;
+        if time.minutes % update_period_minutes == 0 {
+
+            system_task::spawn().ok();
+        }
     }
 
     /// Turns on the LED for a short time when the button is pressed
