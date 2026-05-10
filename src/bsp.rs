@@ -159,7 +159,7 @@ impl Board {
         let led = InvertedPin::new(led_pin);
         let led_delay = periph.TIM2.delay(&mut rcc);
         let mut exti = periph.EXTI;
-        let _button = gpioa.pa14.listen(SignalEdge::Rising, &mut exti);
+        let _button = gpioa.pa11.listen(SignalEdge::Rising, &mut exti);
 
         // RTC
         let date = Date::new(Year(0), Month(0), MonthDay(0));
@@ -278,6 +278,6 @@ impl Led {
     }
 
     pub fn exti_unpend(&mut self) {
-        self.exti.unpend(hal::exti::Event::GPIO14);
+        self.exti.unpend(hal::exti::Event::GPIO11);
     }
 }
