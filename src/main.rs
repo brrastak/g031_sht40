@@ -6,11 +6,11 @@
 use defmt;
 // Global logger
 use defmt_rtt as _;
-use hal::rtc::{Event, Rtc};
+use hal::rtc::{self, Rtc};
 use stm32g0xx_hal as hal;
 use panic_probe as _;
 
-use g031_sht40::bsp::{Board, Display, Sensor};
+use g031_sht40::bsp::{Board, Display, Sensor, Led};
 use g031_sht40::data::{Data, UpdateStatus};
 
 
@@ -29,6 +29,7 @@ mod app {
         sensor: Sensor,
         prev_data: Data,
         rtc: Rtc,
+        led: Led,
     }
 
     #[init]
@@ -40,6 +41,7 @@ mod app {
         let display = board.display;
         let sensor = board.sensor;
         let rtc = board.rtc;
+        let led = board.led;
 
         let prev_data = Data::empty();
 
@@ -52,6 +54,7 @@ mod app {
                 sensor,
                 prev_data,
                 rtc,
+                led,
             },
         )
     }
@@ -82,9 +85,20 @@ mod app {
     fn wake_up(cx: wake_up::Context) {
         let wake_up::LocalResources { rtc, .. } = cx.local;
 
-        rtc.unpend(Event::AlarmA);
+        rtc.unpend(rtc::Event::AlarmA);
 
         system_task::spawn().ok();
+    }
+
+    /// Turns on the LED for a short time when the button is pressed
+    /// to indicate that the device is powered
+    #[task(binds = EXTI4_15, local = [led], priority = 2)]
+    fn is_alive(cx: is_alive::Context) {
+        let is_alive::LocalResources { led, .. } = cx.local;
+
+        led.blink();
+
+        led.exti_unpend();
     }
 
     #[idle]

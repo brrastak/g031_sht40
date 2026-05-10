@@ -9,10 +9,10 @@ use epd_waveshare::{
 };
 use hal::{
     gpio::{
-        Analog, Input, OpenDrain, Output, PA5, PA7, PB6, PB7, PullDown, PushPull, gpioa, gpioa::PA,
+        Analog, Input, OpenDrain, Output, PA5, PA7, PB6, PB7, PullDown, PushPull, gpioa, gpioa::PA, SignalEdge
     },
     i2c::{Config, I2c},
-    pac::{I2C1, SPI1, TIM3, TIM14, TIM16, TIM17},
+    pac::{I2C1, SPI1, TIM2, TIM3, TIM14, TIM16, TIM17, EXTI},
     power::{LowPowerMode, PowerMode},
     prelude::*,
     rcc,
@@ -46,6 +46,7 @@ type Sht =
     sht4x::Sht4x<I2c<I2C1, PB7<Output<OpenDrain>>, PB6<Output<OpenDrain>>>, Delay<TIM14>>;
 type Frame = epd_waveshare::graphics::Display<80, 128, false, 1280, Color>;
 
+
 pub struct Sensor {
     sensor: Sht,
     en_sensor: InvertedPin<gpioa::PA<Output<OpenDrain>>>,
@@ -62,10 +63,17 @@ pub struct Display {
     pub rcc: rcc::Rcc,
 }
 
+pub struct Led {
+    led: InvertedPin<PA<Output<PushPull>>>,
+    led_delay: Delay<TIM2>,
+    pub exti: EXTI,
+}
+
 pub struct Board {
     pub display: Display,
     pub sensor: Sensor,
     pub rtc: Rtc,
+    pub led: Led,
 }
 
 impl Board {
@@ -146,6 +154,13 @@ impl Board {
         let inner_delay = periph.TIM14.delay(&mut rcc);
         let extern_delay = periph.TIM3.delay(&mut rcc);
 
+        // LED and button
+        let led_pin = gpioa.pa4.into_push_pull_output_in_state(PinState::High).downgrade();
+        let led = InvertedPin::new(led_pin);
+        let led_delay = periph.TIM2.delay(&mut rcc);
+        let mut exti = periph.EXTI;
+        let _button = gpioa.pa14.listen(SignalEdge::Rising, &mut exti);
+
         // RTC
         let date = Date::new(Year(0), Month(0), MonthDay(0));
         // Every time as seconds value turns 0
@@ -177,11 +192,18 @@ impl Board {
             epd_delay,
             rcc,
         };
+
+        let led = Led {
+            led,
+            led_delay,
+            exti,
+        };
         
         Board {
             display,
             sensor,
             rtc,
+            led,
         }
     }
 }
@@ -244,5 +266,18 @@ impl Display {
         .expect("Render error");
 
         frame
+    }
+}
+
+impl Led {
+    
+    pub fn blink(&mut self) {
+        self.led.set_high().ok();
+        self.led_delay.delay(2.millis());
+        self.led.set_low().ok();
+    }
+
+    pub fn exti_unpend(&mut self) {
+        self.exti.unpend(hal::exti::Event::GPIO14);
     }
 }
