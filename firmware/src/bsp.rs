@@ -45,6 +45,7 @@ type Epd = Epd1in02<
 type Sht =
     sht4x::Sht4x<I2c<I2C1, PB7<Output<OpenDrain>>, PB6<Output<OpenDrain>>>, Delay<TIM14>>;
 type Frame = epd_waveshare::graphics::Display<80, 128, false, 1280, Color>;
+pub type DebugPin = PA<Output<PushPull>>;
 
 
 pub struct Sensor {
@@ -74,6 +75,7 @@ pub struct Board {
     pub sensor: Sensor,
     pub rtc: Rtc,
     pub led: Led,
+    pub debug_pin: DebugPin,
 }
 
 impl Board {
@@ -161,6 +163,9 @@ impl Board {
         let mut exti = periph.EXTI;
         let _button = gpioa.pa11.listen(SignalEdge::Rising, &mut exti);
 
+        // Debug
+        let debug_pin = gpioa.pa1.into_push_pull_output_in_state(PinState::Low).downgrade();
+
         // RTC
         let date = Date::new(Year(0), Month(0), MonthDay(0));
         // Every time as seconds value turns 0
@@ -204,6 +209,7 @@ impl Board {
             sensor,
             rtc,
             led,
+            debug_pin,
         }
     }
 }

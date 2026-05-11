@@ -3,6 +3,7 @@
 #![no_std]
 
 
+use embedded_hal::digital::OutputPin;
 use defmt;
 // Global logger
 use defmt_rtt as _;
@@ -10,7 +11,7 @@ use hal::rtc::{self, Rtc};
 use stm32g0xx_hal as hal;
 use panic_probe as _;
 
-use g031_sht40::bsp::{Board, Display, Sensor, Led};
+use g031_sht40::bsp::{Board, Display, Sensor, Led, DebugPin};
 use g031_sht40::data::{Data, UpdateStatus};
 
 
@@ -30,6 +31,7 @@ mod app {
         prev_data: Data,
         rtc: Rtc,
         led: Led,
+        debug_pin: DebugPin,
     }
 
     #[init]
@@ -42,6 +44,7 @@ mod app {
         let sensor = board.sensor;
         let rtc = board.rtc;
         let led = board.led;
+        let debug_pin = board.debug_pin;
 
         let prev_data = Data::empty();
 
@@ -55,30 +58,36 @@ mod app {
                 prev_data,
                 rtc,
                 led,
+                debug_pin,
             },
         )
     }
 
-    #[task(local = [display, sensor, prev_data], priority = 1)]
+    #[task(local = [display, sensor, prev_data, debug_pin], priority = 1)]
     async fn system_task(cx: system_task::Context) {
         let system_task::LocalResources {
             display,
             sensor,
             prev_data,
+            debug_pin,
             ..
         } = cx.local;
 
+        debug_pin.set_high().ok();
+
         let data = sensor.read();
 
-        let update_status = data.check_update(prev_data);
-        if update_status == UpdateStatus::NoUpdate {
-            defmt::info!("No update needed");
-            return;
-        }
+        // let update_status = data.check_update(prev_data);
+        // if update_status == UpdateStatus::NoUpdate {
+        //     defmt::info!("No update needed");
+        //     return;
+        // }
 
         display.full_update(&data);
 
         *prev_data = data;
+
+        debug_pin.set_low().ok();
     }
 
     #[task(binds = RTC_TAMP, local = [rtc], priority = 2)]
