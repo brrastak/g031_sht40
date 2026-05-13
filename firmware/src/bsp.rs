@@ -26,7 +26,7 @@ use sht4x::{Precision, Sht4x};
 use stm32g0xx_hal as hal;
 use u8g2_fonts::{FontRenderer, fonts, types::*};
 
-use crate::data::Data;
+use crate::{data::Data, deactivate::ActivatedEpdPins};
 use crate::deactivate::DeactivatedEpdPins;
 
 
@@ -62,6 +62,7 @@ pub struct Display {
     epd_delay: Delay<TIM16>,
     /// For DeactivatedEpdPins
     pub rcc: rcc::Rcc,
+    prev_frame: Frame,
 }
 
 pub struct Led {
@@ -196,6 +197,7 @@ impl Board {
             spi_dev,
             epd_delay,
             rcc,
+            prev_frame: Display1in02::default(),
         };
 
         let led = Led {
@@ -234,19 +236,52 @@ impl Display {
 
         let frame = self.render(data);
 
-        // Reactivate previously deactivated pins (ref. the second comment)
-        let epd_pins = DeactivatedEpdPins::steal_epd_pins(&mut self.rcc);
-        let activated_epd_pins = epd_pins.reactivate();
+        let activated_pins = self.activate_pins();
 
-        self.en_epd.set_high().ok();
         self.epd.wake_up(&mut self.spi_dev, &mut self.epd_delay).expect("EPD error");
         self.epd.update_and_display_frame(&mut self.spi_dev, frame.buffer(), &mut self.epd_delay)
             .expect("EPD error");
         self.epd.sleep(&mut self.spi_dev, &mut self.epd_delay).expect("EPD error");
+
+        self.deactivate_pins(activated_pins);
+    }
+
+    pub fn quick_update(&mut self, data: &Data) {
+
+        let frame = self.render(data);
+
+        let activated_pins = self.activate_pins();
+
+        self.epd.wake_up(&mut self.spi_dev, &mut self.epd_delay).expect("EPD error");
+        self.epd.update_old_frame(&mut self.spi_dev, self.prev_frame.buffer(), &mut self.epd_delay)
+            .expect("EPD error");
+        self.epd.update_new_frame(&mut self.spi_dev, frame.buffer(), &mut self.epd_delay)
+            .expect("EPD error");
+        self.epd.display_frame(&mut self.spi_dev, &mut self.epd_delay).expect("EPD error");
+        self.epd.sleep(&mut self.spi_dev, &mut self.epd_delay).expect("EPD error");
+
+        self.deactivate_pins(activated_pins);
+
+        self.prev_frame = frame;
+    }
+
+    /// Deactive all EPD-related pins to decrease power consumption during sleep mode
+    fn deactivate_pins(&mut self, activated_pins: ActivatedEpdPins) {
+
         self.en_epd.set_low().ok();
 
-        // Deactive all EPD-related pins to decrease power consumption during sleep mode
-        _ = activated_epd_pins.deactivate();
+        _ = activated_pins.deactivate();
+    }
+
+    /// Reactivate previously deactivated pins
+    fn activate_pins(&mut self) -> ActivatedEpdPins {
+
+        let epd_pins = DeactivatedEpdPins::steal_epd_pins(&mut self.rcc);
+        let activated_pins = epd_pins.reactivate();
+
+        self.en_epd.set_high().ok();
+
+        activated_pins
     }
 
     fn render(&mut self, data: &Data) -> Frame {

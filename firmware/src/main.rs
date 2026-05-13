@@ -83,7 +83,7 @@ mod app {
         //     return;
         // }
 
-        display.full_update(&data);
+        display.quick_update(&data);
 
         *prev_data = data;
 
