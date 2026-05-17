@@ -4573,6 +4573,12 @@
 		(uuid "d0a57186-c853-484c-9746-0f1ea43e053c")
 	)
 	(junction
+		(at 114.3 45.72)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "d3c23a47-ed97-4a41-886c-472b342f4b0f")
+	)
+	(junction
 		(at 88.9 64.77)
 		(diameter 0)
 		(color 0 0 0 0)
@@ -4587,10 +4593,6 @@
 	(no_connect
 		(at 118.11 87.63)
 		(uuid "3a561417-072b-4a55-b3b9-773bb70180f4")
-	)
-	(no_connect
-		(at 118.11 92.71)
-		(uuid "c98c3516-cae1-4f34-bb37-f70ffaca70ca")
 	)
 	(no_connect
 		(at 71.12 90.17)
@@ -4658,7 +4660,7 @@
 	)
 	(wire
 		(pts
-			(xy 101.6 50.8) (xy 107.95 50.8)
+			(xy 101.6 50.8) (xy 104.14 50.8)
 		)
 		(stroke
 			(width 0)
@@ -4878,6 +4880,16 @@
 	)
 	(wire
 		(pts
+			(xy 118.11 92.71) (xy 114.3 92.71)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "3d460ab1-e7b0-4e15-90a6-ab250fe02c07")
+	)
+	(wire
+		(pts
 			(xy 88.9 62.23) (xy 88.9 64.77)
 		)
 		(stroke
@@ -4998,7 +5010,7 @@
 	)
 	(wire
 		(pts
-			(xy 88.9 76.2) (xy 107.95 76.2)
+			(xy 88.9 76.2) (xy 104.14 76.2)
 		)
 		(stroke
 			(width 0)
@@ -5468,6 +5480,16 @@
 	)
 	(wire
 		(pts
+			(xy 114.3 83.82) (xy 114.3 92.71)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "b27feed0-b8d0-4157-a58c-be9bd8b5f978")
+	)
+	(wire
+		(pts
 			(xy 177.8 146.05) (xy 228.6 146.05)
 		)
 		(stroke
@@ -5518,7 +5540,7 @@
 	)
 	(wire
 		(pts
-			(xy 73.66 45.72) (xy 127 45.72)
+			(xy 73.66 45.72) (xy 114.3 45.72)
 		)
 		(stroke
 			(width 0)
@@ -5698,6 +5720,16 @@
 	)
 	(wire
 		(pts
+			(xy 114.3 45.72) (xy 127 45.72)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "d6cf34a1-62f5-434e-8954-08675a799a9c")
+	)
+	(wire
+		(pts
 			(xy 233.68 90.17) (xy 260.35 90.17)
 		)
 		(stroke
@@ -5705,6 +5737,16 @@
 			(type default)
 		)
 		(uuid "d8d82350-28cc-4ff5-b168-38c59f0d80b0")
+	)
+	(wire
+		(pts
+			(xy 114.3 45.72) (xy 114.3 73.66)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "e14700af-55e4-47aa-bb4b-d43212c7b66e")
 	)
 	(wire
 		(pts
@@ -5798,7 +5840,7 @@
 	)
 	(wire
 		(pts
-			(xy 107.95 53.34) (xy 107.95 76.2)
+			(xy 104.14 53.34) (xy 104.14 76.2)
 		)
 		(stroke
 			(width 0)
@@ -6885,6 +6927,77 @@
 		)
 	)
 	(symbol
+		(lib_id "Jumper:Jumper_2_Open")
+		(at 114.3 78.74 90)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "488775cb-6935-454e-83ca-01a6d3afdddd")
+		(property "Reference" "JP2"
+			(at 115.57 77.4699 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(property "Value" "Jumper_2_Open"
+			(at 115.57 80.0099 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+				(hide yes)
+			)
+		)
+		(property "Footprint" "Jumper:SolderJumper-2_P1.3mm_Open_TrianglePad1.0x1.5mm"
+			(at 114.3 78.74 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 114.3 78.74 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Jumper, 2-pole, open"
+			(at 114.3 78.74 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "bde217ad-079a-40f0-8603-334f2baed613")
+		)
+		(pin "2"
+			(uuid "424c9cd6-da68-4503-b96e-fcbc0c2c2b52")
+		)
+		(instances
+			(project ""
+				(path "/986578f3-b815-4af2-94ef-1ae768a5f988"
+					(reference "JP2")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "power:GND")
 		(at 139.7 53.34 0)
 		(unit 1)
@@ -7022,7 +7135,7 @@
 	)
 	(symbol
 		(lib_id "Connector:Conn_01x02_Pin")
-		(at 113.03 53.34 180)
+		(at 109.22 53.34 180)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -7030,7 +7143,7 @@
 		(dnp no)
 		(uuid "50d44430-9550-439d-87c7-0c17759734c3")
 		(property "Reference" "J3"
-			(at 113.284 48.006 0)
+			(at 109.474 48.006 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -7038,7 +7151,7 @@
 			)
 		)
 		(property "Value" "Conn_01x02_Pin"
-			(at 112.395 55.88 0)
+			(at 108.585 55.88 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -7047,7 +7160,7 @@
 			)
 		)
 		(property "Footprint" "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical"
-			(at 113.03 53.34 0)
+			(at 109.22 53.34 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -7056,7 +7169,7 @@
 			)
 		)
 		(property "Datasheet" "~"
-			(at 113.03 53.34 0)
+			(at 109.22 53.34 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -7065,7 +7178,7 @@
 			)
 		)
 		(property "Description" "Generic connector, single row, 01x02, script generated"
-			(at 113.03 53.34 0)
+			(at 109.22 53.34 0)
 			(effects
 				(font
 					(size 1.27 1.27)
