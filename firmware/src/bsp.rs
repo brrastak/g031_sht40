@@ -4,7 +4,8 @@ use cortex_m::singleton;
 use embedded_graphics::prelude::*;
 use embedded_hal_bus::spi::ExclusiveDevice;
 use epd_waveshare::{
-    epd1in02::{Display1in02, Epd1in02},
+    epd1in02::{self, Display1in02, Epd1in02},
+    graphics::VarDisplay,
     prelude::*,
 };
 use hal::{
@@ -45,7 +46,18 @@ type Epd = Epd1in02<
 type Sht =
     sht4x::Sht4x<I2c<I2C1, PB7<Output<OpenDrain>>, PB6<Output<OpenDrain>>>, Delay<TIM14>>;
 type Frame = epd_waveshare::graphics::Display<80, 128, false, 1280, Color>;
+type PartialFrame<'a> = VarDisplay<'a, Color>;
+type Font = fonts::u8g2_font_logisoso24_tf;
+pub type DebugPin = PA<Output<PushPull>>;
 
+
+const FONT: FontRenderer = FontRenderer::new::<Font>();
+const HEIGHT: u32 = FONT
+    .get_font_bounding_box(VerticalPosition::Baseline)
+    .size
+    .height;
+const WIDTH: u32 = epd1in02::WIDTH;
+const BUF_SIZE: usize = HEIGHT as usize * WIDTH as usize / 8;
 
 pub struct Sensor {
     sensor: Sht,
@@ -61,6 +73,8 @@ pub struct Display {
     epd_delay: Delay<TIM16>,
     /// For DeactivatedEpdPins
     pub rcc: rcc::Rcc,
+    prev_frame: Frame,
+    partial_frame_buf: [u8; BUF_SIZE],
 }
 
 pub struct Led {
@@ -191,6 +205,8 @@ impl Board {
             spi_dev,
             epd_delay,
             rcc,
+            prev_frame: Display1in02::default(),
+            partial_frame_buf: [0u8; BUF_SIZE],
         };
 
         let led = Led {
@@ -237,6 +253,69 @@ impl Display {
         self.epd.update_and_display_frame(&mut self.spi_dev, frame.buffer(), &mut self.epd_delay)
             .expect("EPD error");
         self.epd.sleep(&mut self.spi_dev, &mut self.epd_delay).expect("EPD error");
+
+        self.deactivate_pins(activated_pins);
+    }
+
+    pub fn quick_update(&mut self, data: &Data) {
+
+        let frame = self.render(data);
+
+        let activated_pins = self.activate_pins();
+
+        self.epd.wake_up(&mut self.spi_dev, &mut self.epd_delay).expect("EPD error");
+        self.epd.update_old_frame(&mut self.spi_dev, self.prev_frame.buffer(), &mut self.epd_delay)
+            .expect("EPD error");
+        self.epd.update_new_frame(&mut self.spi_dev, frame.buffer(), &mut self.epd_delay)
+            .expect("EPD error");
+        self.epd.display_frame(&mut self.spi_dev, &mut self.epd_delay).expect("EPD error");
+        self.epd.sleep(&mut self.spi_dev, &mut self.epd_delay).expect("EPD error");
+
+        self.deactivate_pins(activated_pins);
+
+        self.prev_frame = frame;
+    }
+
+    /// Partial quick update of temperature value only
+    pub fn update_temperature(&mut self, data: &Data) {
+
+        let mut frame_buf = [0u8; BUF_SIZE];
+        let frame = self.render_temperature(data, &mut frame_buf);
+
+        let activated_pins = self.activate_pins();
+
+        self.epd.wake_up(&mut self.spi_dev, &mut self.epd_delay).expect("EPD error");
+        self.epd.update_partial_old_frame(
+            &mut self.spi_dev,
+            &mut self.epd_delay,
+            &self.partial_frame_buf,
+            0,
+            0,
+            WIDTH,
+            HEIGHT
+            )
+            .expect("EPD error");
+        self.epd.update_partial_new_frame(
+            &mut self.spi_dev,
+            &mut self.epd_delay,
+            frame.buffer(),
+            0,
+            0,
+            WIDTH,
+            HEIGHT
+            )
+            .expect("EPD error");
+        self.epd.display_frame(&mut self.spi_dev, &mut self.epd_delay).expect("EPD error");
+        self.epd.sleep(&mut self.spi_dev, &mut self.epd_delay).expect("EPD error");
+
+        self.deactivate_pins(activated_pins);
+
+        self.partial_frame_buf = frame_buf;
+    }
+
+    /// Deactive all EPD-related pins to decrease power consumption during sleep mode
+    fn deactivate_pins(&mut self, activated_pins: ActivatedEpdPins) {
+
         self.en_epd.set_low().ok();
 
         // Deactive all EPD-related pins to decrease power consumption during sleep mode
@@ -248,10 +327,39 @@ impl Display {
         let mut frame = Display1in02::default();
         frame.set_rotation(DisplayRotation::Rotate180);
 
-        let font = FontRenderer::new::<fonts::u8g2_font_logisoso24_tf>();
+        let font = FontRenderer::new::<Font>();
 
         let mut buf = [0u8; 40];
         let message = data.format_into_str(&mut buf);
+
+        frame.clear(self.epd.background_color().clone()).ok();
+        font.render_aligned(
+            message,
+            frame.bounding_box().center(),
+            VerticalPosition::Center,
+            HorizontalAlignment::Center,
+            // Inversed color works with both light and dark background
+            FontColor::Transparent(self.epd.background_color().inverse()),
+            &mut frame,
+        )
+        .expect("Render error");
+
+        frame
+    }
+
+    fn render_temperature<'a>(&mut self, data: &Data, buf: &'a mut [u8]) -> PartialFrame<'a> {
+
+        let mut frame = VarDisplay::new(
+            WIDTH, HEIGHT, buf, false)
+            .unwrap();
+
+        // let mut frame = Display1in02::default();
+        frame.set_rotation(DisplayRotation::Rotate180);
+
+        let font = FontRenderer::new::<Font>();
+
+        let mut buf = [0u8; 20];
+        let message = data.format_temperature_into_str(&mut buf);
 
         frame.clear(self.epd.background_color().clone()).ok();
         font.render_aligned(
