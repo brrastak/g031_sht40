@@ -83,7 +83,7 @@ mod app {
         //     return;
         // }
 
-        display.quick_update(&data);
+        display.update_temperature(&data);
 
         *prev_data = data;
 
