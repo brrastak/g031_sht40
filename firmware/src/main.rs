@@ -27,7 +27,7 @@ mod app {
     struct Local {
         display: Display,
         sensor: Sensor,
-        prev_data: Data,
+        prev_data: Option<Data>,
         rtc: Rtc,
         led: Led,
     }
@@ -43,7 +43,7 @@ mod app {
         let rtc = board.rtc;
         let led = board.led;
 
-        let prev_data = Data::empty();
+        let prev_data: Option<Data> = None;
 
         system_task::spawn().ok();
 
@@ -69,14 +69,17 @@ mod app {
         } = cx.local;
 
         let data = sensor.read();
-
-        let update_status = data.check_update(prev_data);
-        if update_status == UpdateStatus::NoUpdate {
-            defmt::info!("No update needed");
-            return;
+        if data.is_some() {
+            let data = data.as_ref().unwrap();
+            defmt::info!("Temperature: {}°C Humidity: {}%", data.temperature, data.humidity);
+        }
+        else {
+            defmt::warn!("Failed to read data from the sensor!");
         }
 
-        display.full_update(&data);
+        let update_status = Data::check_update(data.as_ref(), prev_data.as_ref());
+
+        display.partial_update(data.as_ref().unwrap_or(&Data::default()), update_status);
 
         *prev_data = data;
     }
@@ -90,6 +93,7 @@ mod app {
         let time = rtc.get_time();
         defmt::info!("Wake up! Time: {}:{}:{}", time.hours, time.minutes, time.seconds);
 
+        // let update_period_minutes = 1;
         let update_period_minutes = 5;
         if time.minutes % update_period_minutes == 0 {
 
