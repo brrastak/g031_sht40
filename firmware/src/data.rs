@@ -66,12 +66,27 @@ impl Data {
         }
     }
 
-    pub fn format_into_str<'a>(&self, buf: &'a mut [u8; 40]) -> &'a str {
+    // pub fn format_into_str<'a>(&self, buf: &'a mut [u8; 40]) -> &'a str {
+
+    //     match self.0.as_ref() {
+    //         Some(DataInner { temperature, humidity }) => {
+    //             defmt::info!("Temperature: {}°C Humidity: {}%", temperature, humidity);
+    //             format_no_std::show(buf, format_args!("{}°C\n{}%", temperature, humidity,))
+    //                 .expect("Buffer for formatted data is too small")
+    //         }
+    //         None => {
+    //             defmt::info!("Sensor reading error");
+    //             "Error"
+    //         }
+    //     }
+    // }
+
+    pub fn format_temperature_into_str<'a>(&self, buf: &'a mut [u8; 20]) -> &'a str {
 
         match self.0.as_ref() {
             Some(DataInner { temperature, humidity }) => {
                 defmt::info!("Temperature: {}°C Humidity: {}%", temperature, humidity);
-                format_no_std::show(buf, format_args!("{}°C\n{}%", temperature, humidity,))
+                format_no_std::show(buf, format_args!("{}°C", temperature))
                     .expect("Buffer for formatted data is too small")
             }
             None => {
@@ -81,12 +96,12 @@ impl Data {
         }
     }
 
-    pub fn format_temperature_into_str<'a>(&self, buf: &'a mut [u8; 20]) -> &'a str {
+    pub fn format_humidity_into_str<'a>(&self, buf: &'a mut [u8; 20]) -> &'a str {
 
         match self.0.as_ref() {
             Some(DataInner { temperature, humidity }) => {
                 defmt::info!("Temperature: {}°C Humidity: {}%", temperature, humidity);
-                format_no_std::show(buf, format_args!("{}°C", temperature))
+                format_no_std::show(buf, format_args!("{}%", humidity))
                     .expect("Buffer for formatted data is too small")
             }
             None => {

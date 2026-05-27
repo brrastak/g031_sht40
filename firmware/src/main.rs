@@ -83,7 +83,7 @@ mod app {
         //     return;
         // }
 
-        display.update_temperature(&data);
+        display.partial_update(&data);
 
         *prev_data = data;
 
@@ -99,7 +99,7 @@ mod app {
         let time = rtc.get_time();
         defmt::info!("Wake up! Time: {}:{}:{}", time.hours, time.minutes, time.seconds);
 
-        let update_period_minutes = 5;
+        let update_period_minutes = 1;
         if time.minutes % update_period_minutes == 0 {
 
             system_task::spawn().ok();

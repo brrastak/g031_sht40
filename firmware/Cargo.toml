@@ -24,7 +24,7 @@ u8g2-fonts = "0.7.2"
 
 [patch.crates-io]
 # For epd1in02 support
-epd-waveshare = {git = "https://github.com/caemor/epd-waveshare.git", branch = "main"}
+epd-waveshare = {git = "https://github.com/brrastak/epd-waveshare.git", branch = "main"}
 # For fixed SPI write
 stm32g0xx-hal = {git = "https://github.com/brrastak/stm32g0xx-hal.git", branch = "spi_write_end"}
 

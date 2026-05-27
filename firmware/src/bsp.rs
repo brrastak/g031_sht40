@@ -58,6 +58,10 @@ const HEIGHT: u32 = FONT
     .height;
 const WIDTH: u32 = epd1in02::WIDTH;
 const BUF_SIZE: usize = HEIGHT as usize * WIDTH as usize / 8;
+// const TEMP_LINE_Y: u32 = epd1in02::HEIGHT * 2 / 3 - (HEIGHT / 2);
+// const HUMIDITY_LINE_Y: u32 = epd1in02::HEIGHT / 3 - (HEIGHT / 2);
+const TEMP_LINE_Y: u32 = epd1in02::HEIGHT / 2;
+const HUMIDITY_LINE_Y: u32 = epd1in02::HEIGHT / 2 - HEIGHT;
 
 pub struct Sensor {
     sensor: Sht,
@@ -73,8 +77,9 @@ pub struct Display {
     epd_delay: Delay<TIM16>,
     /// For DeactivatedEpdPins
     pub rcc: rcc::Rcc,
-    prev_frame: Frame,
-    partial_frame_buf: [u8; BUF_SIZE],
+    // prev_frame: Frame,
+    temperature_frame_buf: [u8; BUF_SIZE],
+    humidity_frame_buf: [u8; BUF_SIZE],
 }
 
 pub struct Led {
@@ -209,8 +214,9 @@ impl Board {
             spi_dev,
             epd_delay,
             rcc,
-            prev_frame: Display1in02::default(),
-            partial_frame_buf: [0u8; BUF_SIZE],
+            // prev_frame: Display1in02::default(),
+            temperature_frame_buf: [0u8; BUF_SIZE],
+            humidity_frame_buf: [0u8; BUF_SIZE],
         };
 
         let led = Led {
@@ -245,54 +251,141 @@ impl Sensor {
 
 impl Display {
     
-    pub fn full_update(&mut self, data: &Data) {
+    // pub fn full_update(&mut self, data: &Data) {
 
-        let frame = self.render(data);
+    //     let frame = self.render(data);
+
+    //     let activated_pins = self.activate_pins();
+
+    //     self.epd.wake_up(&mut self.spi_dev, &mut self.epd_delay).expect("EPD error");
+    //     self.epd.update_and_display_frame(&mut self.spi_dev, frame.buffer(), &mut self.epd_delay)
+    //         .expect("EPD error");
+    //     self.epd.sleep(&mut self.spi_dev, &mut self.epd_delay).expect("EPD error");
+
+    //     self.deactivate_pins(activated_pins);
+    // }
+
+    // pub fn quick_update(&mut self, data: &Data) {
+
+    //     let frame = self.render(data);
+
+    //     let activated_pins = self.activate_pins();
+
+    //     self.epd.wake_up(&mut self.spi_dev, &mut self.epd_delay).expect("EPD error");
+    //     self.epd.update_old_frame(&mut self.spi_dev, self.prev_frame.buffer(), &mut self.epd_delay)
+    //         .expect("EPD error");
+    //     self.epd.update_new_frame(&mut self.spi_dev, frame.buffer(), &mut self.epd_delay)
+    //         .expect("EPD error");
+    //     self.epd.display_frame(&mut self.spi_dev, &mut self.epd_delay).expect("EPD error");
+    //     self.epd.sleep(&mut self.spi_dev, &mut self.epd_delay).expect("EPD error");
+
+    //     self.deactivate_pins(activated_pins);
+
+    //     self.prev_frame = frame;
+    // }
+
+    pub fn partial_update(&mut self, data: &Data) {
+
+        let mut temp_frame_buf = [0u8; BUF_SIZE];
+        let temp_frame = self.render_temperature(data, &mut temp_frame_buf);
+
+        let mut humidity_frame_buf = [0u8; BUF_SIZE];
+        let humidity_frame = self.render_humidity(data, &mut humidity_frame_buf);
 
         let activated_pins = self.activate_pins();
 
         self.epd.wake_up(&mut self.spi_dev, &mut self.epd_delay).expect("EPD error");
-        self.epd.update_and_display_frame(&mut self.spi_dev, frame.buffer(), &mut self.epd_delay)
+        // let buf = self.temperature_frame_buf;
+        // self.update_partial_frame(&buf, temp_frame, TEMP_LINE_Y);
+        // self.epd.display_frame(&mut self.spi_dev, &mut self.epd_delay).expect("EPD error");
+        let buf = self.humidity_frame_buf;
+        self.update_partial_frame(&buf, humidity_frame, HUMIDITY_LINE_Y);
+
+        defmt::info!("y: {}\n h: {}", TEMP_LINE_Y, HEIGHT);
+
+        self.epd.display_partial_frame(
+            &mut self.spi_dev, 
+            &mut self.epd_delay, 
+            0, 
+            HUMIDITY_LINE_Y, 
+            WIDTH, 
+            HEIGHT
+            )
             .expect("EPD error");
+
+        // self.epd.display_partial_frame(
+        //     &mut self.spi_dev, 
+        //     &mut self.epd_delay, 
+        //     0, 
+        //     TEMP_LINE_Y, 
+        //     WIDTH, 
+        //     HEIGHT * 2
+        //     )
+        //     .expect("EPD error");
+
+        // self.epd.update_partial_old_frame(
+        //     &mut self.spi_dev,
+        //     &mut self.epd_delay,
+        //     &self.temperature_frame_buf,
+        //     0,
+        //     TEMP_LINE_Y,
+        //     WIDTH,
+        //     HEIGHT
+        //     )
+        //     .expect("EPD error");
+        // self.epd.update_partial_new_frame(
+        //     &mut self.spi_dev,
+        //     &mut self.epd_delay,
+        //     temp_frame.buffer(),
+        //     0,
+        //     TEMP_LINE_Y,
+        //     WIDTH,
+        //     HEIGHT
+        //     )
+        //     .expect("EPD error");
+        // self.epd.display_frame(&mut self.spi_dev, &mut self.epd_delay).expect("EPD error");
+        // self.epd.update_partial_old_frame(
+        //     &mut self.spi_dev,
+        //     &mut self.epd_delay,
+        //     &self.humidity_frame_buf,
+        //     0,
+        //     HUMIDITY_LINE_Y,
+        //     WIDTH,
+        //     HEIGHT
+        //     )
+        //     .expect("EPD error");
+        // self.epd.update_partial_new_frame(
+        //     &mut self.spi_dev,
+        //     &mut self.epd_delay,
+        //     humidity_frame.buffer(),
+        //     0,
+        //     HUMIDITY_LINE_Y,
+        //     WIDTH,
+        //     HEIGHT
+        //     )
+        //     .expect("EPD error");
+        // self.epd.display_frame(&mut self.spi_dev, &mut self.epd_delay).expect("EPD error");
         self.epd.sleep(&mut self.spi_dev, &mut self.epd_delay).expect("EPD error");
 
         self.deactivate_pins(activated_pins);
+
+        self.temperature_frame_buf = temp_frame_buf;
+        self.humidity_frame_buf = humidity_frame_buf;
     }
 
-    pub fn quick_update(&mut self, data: &Data) {
+    fn update_partial_frame<'a>(
+        &mut self, 
+        prev_frame_buf: &'a [u8; BUF_SIZE], 
+        new_frame: VarDisplay<'a, Color>,
+        y: u32
+    ) {
 
-        let frame = self.render(data);
-
-        let activated_pins = self.activate_pins();
-
-        self.epd.wake_up(&mut self.spi_dev, &mut self.epd_delay).expect("EPD error");
-        self.epd.update_old_frame(&mut self.spi_dev, self.prev_frame.buffer(), &mut self.epd_delay)
-            .expect("EPD error");
-        self.epd.update_new_frame(&mut self.spi_dev, frame.buffer(), &mut self.epd_delay)
-            .expect("EPD error");
-        self.epd.display_frame(&mut self.spi_dev, &mut self.epd_delay).expect("EPD error");
-        self.epd.sleep(&mut self.spi_dev, &mut self.epd_delay).expect("EPD error");
-
-        self.deactivate_pins(activated_pins);
-
-        self.prev_frame = frame;
-    }
-
-    /// Partial quick update of temperature value only
-    pub fn update_temperature(&mut self, data: &Data) {
-
-        let mut frame_buf = [0u8; BUF_SIZE];
-        let frame = self.render_temperature(data, &mut frame_buf);
-
-        let activated_pins = self.activate_pins();
-
-        self.epd.wake_up(&mut self.spi_dev, &mut self.epd_delay).expect("EPD error");
         self.epd.update_partial_old_frame(
             &mut self.spi_dev,
             &mut self.epd_delay,
-            &self.partial_frame_buf,
+            prev_frame_buf,
             0,
-            0,
+            y,
             WIDTH,
             HEIGHT
             )
@@ -300,20 +393,52 @@ impl Display {
         self.epd.update_partial_new_frame(
             &mut self.spi_dev,
             &mut self.epd_delay,
-            frame.buffer(),
+            new_frame.buffer(),
             0,
-            0,
+            y,
             WIDTH,
             HEIGHT
             )
             .expect("EPD error");
-        self.epd.display_frame(&mut self.spi_dev, &mut self.epd_delay).expect("EPD error");
-        self.epd.sleep(&mut self.spi_dev, &mut self.epd_delay).expect("EPD error");
-
-        self.deactivate_pins(activated_pins);
-
-        self.partial_frame_buf = frame_buf;
     }
+
+    /// Partial quick update of temperature value only
+    // pub fn update_temperature(&mut self, data: &Data) {
+
+    //     let mut frame_buf = [0u8; BUF_SIZE];
+    //     let temp_frame = self.render_temperature(data, &mut frame_buf);
+    //     let humidity_frame = self.render_humidity(data, &mut frame_buf);
+
+    //     let activated_pins = self.activate_pins();
+
+    //     self.epd.wake_up(&mut self.spi_dev, &mut self.epd_delay).expect("EPD error");
+    //     self.epd.update_partial_old_frame(
+    //         &mut self.spi_dev,
+    //         &mut self.epd_delay,
+    //         &self.partial_frame_buf,
+    //         0,
+    //         0,
+    //         WIDTH,
+    //         HEIGHT
+    //         )
+    //         .expect("EPD error");
+    //     self.epd.update_partial_new_frame(
+    //         &mut self.spi_dev,
+    //         &mut self.epd_delay,
+    //         frame.buffer(),
+    //         0,
+    //         0,
+    //         WIDTH,
+    //         HEIGHT
+    //         )
+    //         .expect("EPD error");
+    //     self.epd.display_frame(&mut self.spi_dev, &mut self.epd_delay).expect("EPD error");
+    //     self.epd.sleep(&mut self.spi_dev, &mut self.epd_delay).expect("EPD error");
+
+    //     self.deactivate_pins(activated_pins);
+
+    //     self.partial_frame_buf = frame_buf;
+    // }
 
     /// Deactive all EPD-related pins to decrease power consumption during sleep mode
     fn deactivate_pins(&mut self, activated_pins: ActivatedEpdPins) {
@@ -334,32 +459,92 @@ impl Display {
         activated_pins
     }
 
-    fn render(&mut self, data: &Data) -> Frame {
+    // fn render(&mut self, data: &Data) -> Frame {
 
-        let mut frame = Display1in02::default();
-        frame.set_rotation(DisplayRotation::Rotate180);
+    //     let mut frame = Display1in02::default();
+    //     frame.set_rotation(DisplayRotation::Rotate180);
 
-        let font = FontRenderer::new::<Font>();
+    //     let font = FontRenderer::new::<Font>();
 
-        let mut buf = [0u8; 40];
-        let message = data.format_into_str(&mut buf);
+    //     let mut buf = [0u8; 40];
+    //     let message = data.format_into_str(&mut buf);
 
-        frame.clear(self.epd.background_color().clone()).ok();
-        font.render_aligned(
-            message,
-            frame.bounding_box().center(),
-            VerticalPosition::Center,
-            HorizontalAlignment::Center,
-            // Inversed color works with both light and dark background
-            FontColor::Transparent(self.epd.background_color().inverse()),
-            &mut frame,
-        )
-        .expect("Render error");
+    //     frame.clear(self.epd.background_color().clone()).ok();
+    //     font.render_aligned(
+    //         message,
+    //         frame.bounding_box().center(),
+    //         VerticalPosition::Center,
+    //         HorizontalAlignment::Center,
+    //         // Inversed color works with both light and dark background
+    //         FontColor::Transparent(self.epd.background_color().inverse()),
+    //         &mut frame,
+    //     )
+    //     .expect("Render error");
 
-        frame
-    }
+    //     frame
+    // }
 
     fn render_temperature<'a>(&mut self, data: &Data, buf: &'a mut [u8]) -> PartialFrame<'a> {
+
+        self.render_value(data, buf, true)
+        // let mut frame = VarDisplay::new(
+        //     WIDTH, HEIGHT, buf, false)
+        //     .unwrap();
+
+        // // let mut frame = Display1in02::default();
+        // frame.set_rotation(DisplayRotation::Rotate180);
+
+        // let font = FontRenderer::new::<Font>();
+
+        // let mut buf = [0u8; 20];
+        // let message = data.format_temperature_into_str(&mut buf);
+
+        // frame.clear(self.epd.background_color().clone()).ok();
+        // font.render_aligned(
+        //     message,
+        //     frame.bounding_box().center(),
+        //     VerticalPosition::Center,
+        //     HorizontalAlignment::Center,
+        //     // Inversed color works with both light and dark background
+        //     FontColor::Transparent(self.epd.background_color().inverse()),
+        //     &mut frame,
+        // )
+        // .expect("Render error");
+
+        // frame
+    }
+
+    fn render_humidity<'a>(&mut self, data: &Data, buf: &'a mut [u8]) -> PartialFrame<'a> {
+
+        self.render_value(data, buf, false)
+        // let mut frame = VarDisplay::new(
+        //     WIDTH, HEIGHT, buf, false)
+        //     .unwrap();
+
+        // // let mut frame = Display1in02::default();
+        // frame.set_rotation(DisplayRotation::Rotate180);
+
+        // let font = FontRenderer::new::<Font>();
+
+        // let mut buf = [0u8; 20];
+        // let message = data.format_humidity_into_str(&mut buf);
+
+        // frame.clear(self.epd.background_color().clone()).ok();
+        // font.render_aligned(
+        //     message,
+        //     frame.bounding_box().center(),
+        //     VerticalPosition::Center,
+        //     HorizontalAlignment::Center,
+        //     // Inversed color works with both light and dark background
+        //     FontColor::Transparent(self.epd.background_color().inverse()),
+        //     &mut frame,
+        // )
+        // .expect("Render error");
+
+        // frame
+    }
+
+    fn render_value<'a>(&mut self, data: &Data, buf: &'a mut [u8], value: bool) -> PartialFrame<'a> {
 
         let mut frame = VarDisplay::new(
             WIDTH, HEIGHT, buf, false)
@@ -371,7 +556,12 @@ impl Display {
         let font = FontRenderer::new::<Font>();
 
         let mut buf = [0u8; 20];
-        let message = data.format_temperature_into_str(&mut buf);
+        let message = if value {
+            data.format_temperature_into_str(&mut buf)
+        }
+        else {
+            data.format_humidity_into_str(&mut buf)
+        };
 
         frame.clear(self.epd.background_color().clone()).ok();
         font.render_aligned(
