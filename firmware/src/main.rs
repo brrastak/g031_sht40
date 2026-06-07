@@ -2,23 +2,20 @@
 #![no_main]
 #![no_std]
 
-
 use defmt;
 // Global logger
 use defmt_rtt as _;
 use hal::rtc::{self, Rtc};
-use stm32g0xx_hal as hal;
 use panic_halt as _;
+use stm32g0xx_hal as hal;
 
-use g031_sht40::bsp::{Board, Display, Sensor, Led};
+use g031_sht40::bsp::{Board, Display, Led, Sensor};
 use g031_sht40::data::{Data, UpdateStatus};
-
 
 #[rtic::app(device = hal::pac, peripherals = true, dispatchers = [EXTI0_1])]
 mod app {
 
     use super::*;
-
 
     #[shared]
     struct Shared {}
@@ -34,7 +31,6 @@ mod app {
 
     #[init]
     fn init(cx: init::Context) -> (Shared, Local) {
-        
         let board = Board::new(cx.device, cx.core);
         defmt::info!("Initialization finished!");
 
@@ -71,9 +67,12 @@ mod app {
         let data = sensor.read();
         if data.is_some() {
             let data = data.as_ref().unwrap();
-            defmt::info!("Temperature: {}°C Humidity: {}%", data.temperature, data.humidity);
-        }
-        else {
+            defmt::info!(
+                "Temperature: {}°C Humidity: {}%",
+                data.temperature,
+                data.humidity
+            );
+        } else {
             defmt::warn!("Failed to read data from the sensor!");
         }
 
@@ -91,12 +90,16 @@ mod app {
         rtc.unpend(rtc::Event::AlarmA);
 
         let time = rtc.get_time();
-        defmt::info!("Wake up! Time: {}:{}:{}", time.hours, time.minutes, time.seconds);
+        defmt::info!(
+            "Wake up! Time: {}:{}:{}",
+            time.hours,
+            time.minutes,
+            time.seconds
+        );
 
         // let update_period_minutes = 1;
         let update_period_minutes = 5;
         if time.minutes % update_period_minutes == 0 {
-
             system_task::spawn().ok();
         }
     }
@@ -118,5 +121,4 @@ mod app {
             cortex_m::asm::wfi();
         }
     }
-
 }

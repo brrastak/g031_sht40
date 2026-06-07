@@ -7,19 +7,16 @@ use epd_waveshare::{
     prelude::*,
 };
 use hal::{
-    gpio::{
-        Input, Output, PullDown, PushPull, gpioa, gpioa::PA
-    },
+    gpio::{Input, Output, PullDown, PushPull, gpioa, gpioa::PA},
     prelude::*,
     rcc,
 };
 use stm32g0xx_hal as hal;
 use u8g2_fonts::{FontRenderer, fonts, types::*};
 
-use crate::{bsp::{Epd, EpdDelay, EpdSpiDev}};
+use crate::bsp::{Epd, EpdDelay, EpdSpiDev};
 use crate::data::{Data, UpdateStatus};
 use crate::deactivate::{ActivatedEpdPins, DeactivatedEpdPins};
-
 
 // type Frame = epd_waveshare::graphics::Display<80, 128, false, 1280, Color>;
 type PartialFrame<'a> = VarDisplay<'a, Color>;
@@ -50,7 +47,6 @@ pub enum RenderTarget {
     Error,
 }
 
-
 /// Display related HW
 pub struct Display {
     epd: Epd,
@@ -65,7 +61,6 @@ pub struct Display {
 }
 
 impl Display {
-    
     /// Create new Display instance and initialize EPD
     /// Arguments:
     /// - `spi_dev`: SPI device for EPD communication
@@ -84,9 +79,8 @@ impl Display {
         mut en_epd: PA<Output<PushPull>>,
         mut rcc: rcc::Rcc,
     ) -> Self {
-
         en_epd.set_high().ok();
-        
+
         let mut epd = Epd1in02::new(
             &mut spi_dev,
             epd_busy,
@@ -116,7 +110,6 @@ impl Display {
     }
 
     pub fn partial_update(&mut self, data: &Data, update_status: UpdateStatus) {
-
         if update_status == UpdateStatus::NoUpdate {
             defmt::info!("No update needed");
             return;
@@ -129,17 +122,25 @@ impl Display {
         // Activate EPD
         let activated_pins = self.activate_pins();
         self.en_epd.set_high().ok();
-        self.epd.wake_up(&mut self.spi_dev, &mut self.epd_delay).expect("EPD error");
+        self.epd
+            .wake_up(&mut self.spi_dev, &mut self.epd_delay)
+            .expect("EPD error");
 
         // Proceed full refresh
         self.update_counter += 1;
-        if self.update_counter >= CLEAR_NUMBER_OF_UPDATES || update_status == UpdateStatus::UpdateBothFull || update_status == UpdateStatus::UpdateError {
+        if self.update_counter >= CLEAR_NUMBER_OF_UPDATES
+            || update_status == UpdateStatus::UpdateBothFull
+            || update_status == UpdateStatus::UpdateError
+        {
             defmt::info!("Full screen refresh");
-            self.epd.clear_frame(&mut self.spi_dev, &mut self.epd_delay).expect("EPD error");
+            self.epd
+                .clear_frame(&mut self.spi_dev, &mut self.epd_delay)
+                .expect("EPD error");
             self.update_counter = 0;
         }
 
-        let mut render_and_update = |prev_frame_buf: &mut [u8; FRAME_SIZE], target: RenderTarget| {
+        let mut render_and_update = |prev_frame_buf: &mut [u8; FRAME_SIZE],
+                                     target: RenderTarget| {
             let mut new_frame_buf = [background_color; FRAME_SIZE];
             let new_frame = self.render_partial_frame(data, &mut new_frame_buf, &target);
             let y = match target {
@@ -156,57 +157,61 @@ impl Display {
                 RenderTarget::Humidity => {
                     self.humidity_frame_buf = new_frame_buf;
                 }
-                RenderTarget::Error => ()
+                RenderTarget::Error => (),
             }
         };
 
         match update_status {
             UpdateStatus::UpdateTemperature => {
                 render_and_update(&mut temperature_frame_buf, RenderTarget::Temperature);
-                self.epd.display_partial_frame(
-                    &mut self.spi_dev, 
-                    &mut self.epd_delay, 
-                    0, 
-                    TEMPERATURE_LINE_Y, 
-                    TEXT_WIDTH, 
-                    TEXT_HEIGHT
+                self.epd
+                    .display_partial_frame(
+                        &mut self.spi_dev,
+                        &mut self.epd_delay,
+                        0,
+                        TEMPERATURE_LINE_Y,
+                        TEXT_WIDTH,
+                        TEXT_HEIGHT,
                     )
                     .expect("EPD error");
             }
             UpdateStatus::UpdateHumidity => {
                 render_and_update(&mut humidity_frame_buf, RenderTarget::Humidity);
-                self.epd.display_partial_frame(
-                    &mut self.spi_dev, 
-                    &mut self.epd_delay, 
-                    0, 
-                    HUMIDITY_LINE_Y, 
-                    TEXT_WIDTH, 
-                    TEXT_HEIGHT
+                self.epd
+                    .display_partial_frame(
+                        &mut self.spi_dev,
+                        &mut self.epd_delay,
+                        0,
+                        HUMIDITY_LINE_Y,
+                        TEXT_WIDTH,
+                        TEXT_HEIGHT,
                     )
                     .expect("EPD error");
             }
             UpdateStatus::UpdateBoth | UpdateStatus::UpdateBothFull => {
                 render_and_update(&mut temperature_frame_buf, RenderTarget::Temperature);
                 render_and_update(&mut humidity_frame_buf, RenderTarget::Humidity);
-                self.epd.display_partial_frame(
-                    &mut self.spi_dev, 
-                    &mut self.epd_delay, 
-                    0, 
-                    BOTH_LINES_Y, 
-                    TEXT_WIDTH, 
-                    TEXT_HEIGHT * 2
+                self.epd
+                    .display_partial_frame(
+                        &mut self.spi_dev,
+                        &mut self.epd_delay,
+                        0,
+                        BOTH_LINES_Y,
+                        TEXT_WIDTH,
+                        TEXT_HEIGHT * 2,
                     )
                     .expect("EPD error");
             }
             UpdateStatus::UpdateError => {
                 render_and_update(&mut [background_color; FRAME_SIZE], RenderTarget::Error);
-                self.epd.display_partial_frame(
-                    &mut self.spi_dev, 
-                    &mut self.epd_delay, 
-                    0, 
-                    BOTH_LINES_Y, 
-                    TEXT_WIDTH, 
-                    TEXT_HEIGHT * 2
+                self.epd
+                    .display_partial_frame(
+                        &mut self.spi_dev,
+                        &mut self.epd_delay,
+                        0,
+                        BOTH_LINES_Y,
+                        TEXT_WIDTH,
+                        TEXT_HEIGHT * 2,
                     )
                     .expect("EPD error");
             }
@@ -214,42 +219,44 @@ impl Display {
         }
 
         // Deactivate EPD to save power
-        self.epd.sleep(&mut self.spi_dev, &mut self.epd_delay).expect("EPD error");
+        self.epd
+            .sleep(&mut self.spi_dev, &mut self.epd_delay)
+            .expect("EPD error");
         self.deactivate_pins(activated_pins);
     }
 
     fn update_partial_frame<'a>(
-        &mut self, 
-        prev_frame_buf: &'a [u8; FRAME_SIZE], 
+        &mut self,
+        prev_frame_buf: &'a [u8; FRAME_SIZE],
         new_frame: VarDisplay<'a, Color>,
-        y: u32
+        y: u32,
     ) {
-
-        self.epd.update_partial_old_frame(
-            &mut self.spi_dev,
-            &mut self.epd_delay,
-            prev_frame_buf,
-            0,
-            y,
-            TEXT_WIDTH,
-            TEXT_HEIGHT
+        self.epd
+            .update_partial_old_frame(
+                &mut self.spi_dev,
+                &mut self.epd_delay,
+                prev_frame_buf,
+                0,
+                y,
+                TEXT_WIDTH,
+                TEXT_HEIGHT,
             )
             .expect("EPD error");
-        self.epd.update_partial_new_frame(
-            &mut self.spi_dev,
-            &mut self.epd_delay,
-            new_frame.buffer(),
-            0,
-            y,
-            TEXT_WIDTH,
-            TEXT_HEIGHT
+        self.epd
+            .update_partial_new_frame(
+                &mut self.spi_dev,
+                &mut self.epd_delay,
+                new_frame.buffer(),
+                0,
+                y,
+                TEXT_WIDTH,
+                TEXT_HEIGHT,
             )
             .expect("EPD error");
     }
 
     /// Deactive all EPD-related pins to decrease power consumption during sleep mode
     fn deactivate_pins(&mut self, activated_pins: ActivatedEpdPins) {
-
         self.en_epd.set_low().ok();
 
         _ = activated_pins.deactivate();
@@ -257,7 +264,6 @@ impl Display {
 
     /// Reactivate previously deactivated pins
     fn activate_pins(&mut self) -> ActivatedEpdPins {
-
         let epd_pins = DeactivatedEpdPins::steal_epd_pins(&mut self.rcc);
         let activated_pins = epd_pins.reactivate();
 
@@ -266,11 +272,13 @@ impl Display {
         activated_pins
     }
 
-    fn render_partial_frame<'a>(&mut self, data: &Data, buf: &'a mut [u8], target: &RenderTarget) -> PartialFrame<'a> {
-
-        let mut frame = VarDisplay::new(
-            TEXT_WIDTH, TEXT_HEIGHT, buf, false)
-            .unwrap();
+    fn render_partial_frame<'a>(
+        &mut self,
+        data: &Data,
+        buf: &'a mut [u8],
+        target: &RenderTarget,
+    ) -> PartialFrame<'a> {
+        let mut frame = VarDisplay::new(TEXT_WIDTH, TEXT_HEIGHT, buf, false).unwrap();
 
         frame.set_rotation(DisplayRotation::Rotate180);
 
@@ -278,13 +286,9 @@ impl Display {
 
         let mut buf = [0u8; 20];
         let message = match target {
-            RenderTarget::Temperature => {
-                data.format_temperature_into_str(&mut buf)
-            }
-            RenderTarget::Humidity => {
-                data.format_humidity_into_str(&mut buf)
-            }
-            RenderTarget::Error => "Error"
+            RenderTarget::Temperature => data.format_temperature_into_str(&mut buf),
+            RenderTarget::Humidity => data.format_humidity_into_str(&mut buf),
+            RenderTarget::Error => "Error",
         };
 
         frame.clear(self.epd.background_color().clone()).ok();

@@ -5,10 +5,11 @@ use embedded_hal_bus::spi::ExclusiveDevice;
 use epd_waveshare::epd1in02::Epd1in02;
 use hal::{
     gpio::{
-        Analog, Input, OpenDrain, Output, PA5, PA7, PB6, PB7, PullDown, PushPull, gpioa, gpioa::PA, SignalEdge
+        Analog, Input, OpenDrain, Output, PA5, PA7, PB6, PB7, PullDown, PushPull, SignalEdge,
+        gpioa, gpioa::PA,
     },
     i2c::{Config, I2c},
-    pac::{I2C1, SPI1, TIM2, TIM3, TIM14, TIM16, TIM17, EXTI},
+    pac::{EXTI, I2C1, SPI1, TIM2, TIM3, TIM14, TIM16, TIM17},
     power::{LowPowerMode, PowerMode},
     prelude::*,
     rcc,
@@ -24,9 +25,7 @@ use stm32g0xx_hal as hal;
 use crate::data::Data;
 pub use crate::display::Display;
 
-
-type Sht =
-    sht4x::Sht4x<I2c<I2C1, PB7<Output<OpenDrain>>, PB6<Output<OpenDrain>>>, Delay<TIM14>>;
+type Sht = sht4x::Sht4x<I2c<I2C1, PB7<Output<OpenDrain>>, PB6<Output<OpenDrain>>>, Delay<TIM14>>;
 pub type DebugPin = PA<Output<PushPull>>;
 // Types for EPD display
 pub type EpdDelay = Delay<TIM16>;
@@ -42,7 +41,6 @@ pub type Epd = Epd1in02<
     PA<Output<PushPull>>,
     Delay<TIM16>,
 >;
-
 
 pub struct Sensor {
     sensor: Sht,
@@ -65,17 +63,13 @@ pub struct Board {
 }
 
 impl Board {
-    
     /// Configure clock to 1MHz,
     /// initialize sensor and display,
     /// configure RTC to wake up every 1 minute,
     /// and set up the board to enter deep-sleep on wfi.
     pub fn new(periph: hal::pac::Peripherals, core: cortex_m::Peripherals) -> Self {
-
         // Configure clock to 1MHz
-        let mut rcc = periph
-            .RCC
-            .freeze(rcc::Config::hsi(rcc::Prescaler::Div16));
+        let mut rcc = periph.RCC.freeze(rcc::Config::hsi(rcc::Prescaler::Div16));
 
         let gpioa = periph.GPIOA.split(&mut rcc);
         let gpiob = periph.GPIOB.split(&mut rcc);
@@ -88,15 +82,16 @@ impl Board {
         let en_sensor = InvertedPin::new(en_sensor);
         let sda = gpiob.pb7.into_open_drain_output_in_state(PinState::High);
         let scl = gpiob.pb6.into_open_drain_output_in_state(PinState::High);
-        let i2c = periph
-            .I2C1
-            .i2c(sda, scl, Config::new(100.kHz()), &mut rcc);
+        let i2c = periph.I2C1.i2c(sda, scl, Config::new(100.kHz()), &mut rcc);
         let sensor: Sht = Sht4x::new(i2c);
         let inner_delay = periph.TIM14.delay(&mut rcc);
         let extern_delay = periph.TIM3.delay(&mut rcc);
 
         // LED and button
-        let led_pin = gpioa.pa4.into_push_pull_output_in_state(PinState::High).downgrade();
+        let led_pin = gpioa
+            .pa4
+            .into_push_pull_output_in_state(PinState::High)
+            .downgrade();
         let led = InvertedPin::new(led_pin);
         let led_delay = periph.TIM2.delay(&mut rcc);
         let mut exti = periph.EXTI;
@@ -114,8 +109,7 @@ impl Board {
         // Let the core enter deep-sleep while waiting on wfi
         let mut power = periph.PWR.constrain(&mut rcc);
         power.set_mode(PowerMode::UltraLowPower(LowPowerMode::StopMode2));
-        let mut scb = core
-        .SCB;
+        let mut scb = core.SCB;
         scb.set_sleepdeep();
 
         // Epd display
@@ -164,7 +158,7 @@ impl Board {
             led_delay,
             exti,
         };
-        
+
         Board {
             display,
             sensor,
@@ -175,9 +169,7 @@ impl Board {
 }
 
 impl Sensor {
-    
     pub fn read(&mut self) -> Option<Data> {
-
         self.en_sensor.set_high().ok();
         // Delay after switching sensor on
         self.extern_delay.delay(2.millis());
@@ -189,7 +181,6 @@ impl Sensor {
 }
 
 impl Led {
-    
     pub fn blink(&mut self) {
         self.led.set_high().ok();
         self.led_delay.delay(2.millis());

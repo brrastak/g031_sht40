@@ -2,7 +2,6 @@
 
 use fixed::types::*;
 
-
 #[derive(Debug, PartialEq, Clone, Default)]
 pub struct Data {
     pub temperature: I16F16,
@@ -21,33 +20,32 @@ pub enum UpdateStatus {
 }
 
 impl Data {
-
-    pub fn from_sensor_measurement<Err>(measurement: Result<sht4x::Measurement, Err>) -> Option<Self> {
-
+    pub fn from_sensor_measurement<Err>(
+        measurement: Result<sht4x::Measurement, Err>,
+    ) -> Option<Self> {
         match measurement {
-            Ok(m) => Some(
-                Data::from_values(
+            Ok(m) => Some(Data::from_values(
                 m.temperature_celsius(),
-                m.humidity_percent()
-                )
-        ),
+                m.humidity_percent(),
+            )),
             Err(_) => None,
         }
     }
 
     fn from_values(temperature: I16F16, humidity: I16F16) -> Self {
-
         // Keep one decimal digit in a fractional part
         let temperature = temperature * 10;
         let temperature = temperature.round() / 10;
 
         let humidity = humidity.round();
 
-        Data { temperature, humidity }
+        Data {
+            temperature,
+            humidity,
+        }
     }
 
     pub fn check_update(current: Option<&Self>, prev: Option<&Data>) -> UpdateStatus {
-
         if current.is_none() {
             return UpdateStatus::UpdateError;
         }
@@ -71,24 +69,20 @@ impl Data {
     }
 
     pub fn format_temperature_into_str<'a>(&self, buf: &'a mut [u8; 20]) -> &'a str {
-
         format_no_std::show(buf, format_args!("{}°C", self.temperature))
             .expect("Buffer for formatted data is too small")
     }
 
     pub fn format_humidity_into_str<'a>(&self, buf: &'a mut [u8; 20]) -> &'a str {
-
         format_no_std::show(buf, format_args!("{}%", self.humidity))
             .expect("Buffer for formatted data is too small")
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use pretty_assertions::{assert_eq, assert_ne};
-
 
     #[test]
     fn round_temperature() {
@@ -110,7 +104,10 @@ mod tests {
 
     #[test]
     fn format_temperature() {
-        let data = Data { temperature: I16F16::from_num(36.6), humidity: I16F16::from_num(57) };
+        let data = Data {
+            temperature: I16F16::from_num(36.6),
+            humidity: I16F16::from_num(57),
+        };
 
         let mut buf = [0u8; 20];
         let formatted = data.format_temperature_into_str(&mut buf);
@@ -119,7 +116,10 @@ mod tests {
 
     #[test]
     fn format_humidity() {
-        let data = Data { temperature: I16F16::from_num(36.6), humidity: I16F16::from_num(57) };
+        let data = Data {
+            temperature: I16F16::from_num(36.6),
+            humidity: I16F16::from_num(57),
+        };
 
         let mut buf = [0u8; 20];
         let formatted = data.format_humidity_into_str(&mut buf);
@@ -128,34 +128,70 @@ mod tests {
 
     #[test]
     fn update_temperature() {
-        let prev = Data { temperature: I16F16::from_num(23.0), humidity: I16F16::from_num(56) };
-        let new = Data { temperature: I16F16::from_num(24.0), humidity: I16F16::from_num(56) };
+        let prev = Data {
+            temperature: I16F16::from_num(23.0),
+            humidity: I16F16::from_num(56),
+        };
+        let new = Data {
+            temperature: I16F16::from_num(24.0),
+            humidity: I16F16::from_num(56),
+        };
 
-        assert_eq!(Data::check_update(Some(&new), Some(&prev)), UpdateStatus::UpdateTemperature);
+        assert_eq!(
+            Data::check_update(Some(&new), Some(&prev)),
+            UpdateStatus::UpdateTemperature
+        );
     }
 
     #[test]
     fn update_humidity() {
-        let prev = Data { temperature: I16F16::from_num(23.0), humidity: I16F16::from_num(56) };
-        let new = Data { temperature: I16F16::from_num(23.0), humidity: I16F16::from_num(57) };
+        let prev = Data {
+            temperature: I16F16::from_num(23.0),
+            humidity: I16F16::from_num(56),
+        };
+        let new = Data {
+            temperature: I16F16::from_num(23.0),
+            humidity: I16F16::from_num(57),
+        };
 
-        assert_eq!(Data::check_update(Some(&new), Some(&prev)), UpdateStatus::UpdateHumidity);
+        assert_eq!(
+            Data::check_update(Some(&new), Some(&prev)),
+            UpdateStatus::UpdateHumidity
+        );
     }
 
     #[test]
     fn update_both() {
-        let prev = Data { temperature: I16F16::from_num(23.0), humidity: I16F16::from_num(56) };
-        let new = Data { temperature: I16F16::from_num(24.0), humidity: I16F16::from_num(57) };
+        let prev = Data {
+            temperature: I16F16::from_num(23.0),
+            humidity: I16F16::from_num(56),
+        };
+        let new = Data {
+            temperature: I16F16::from_num(24.0),
+            humidity: I16F16::from_num(57),
+        };
 
-        assert_eq!(Data::check_update(Some(&new), Some(&prev)), UpdateStatus::UpdateBoth);
+        assert_eq!(
+            Data::check_update(Some(&new), Some(&prev)),
+            UpdateStatus::UpdateBoth
+        );
     }
 
     #[test]
     fn no_update() {
-        let prev = Data { temperature: I16F16::from_num(23.0), humidity: I16F16::from_num(56) };
-        let new = Data { temperature: I16F16::from_num(23.0), humidity: I16F16::from_num(56) };
+        let prev = Data {
+            temperature: I16F16::from_num(23.0),
+            humidity: I16F16::from_num(56),
+        };
+        let new = Data {
+            temperature: I16F16::from_num(23.0),
+            humidity: I16F16::from_num(56),
+        };
 
-        assert_eq!(Data::check_update(Some(&new), Some(&prev)), UpdateStatus::NoUpdate);
+        assert_eq!(
+            Data::check_update(Some(&new), Some(&prev)),
+            UpdateStatus::NoUpdate
+        );
     }
 
     #[test]
@@ -165,15 +201,27 @@ mod tests {
 
     #[test]
     fn handle_none_to_some() {
-        let new = Data { temperature: I16F16::from_num(23.0), humidity: I16F16::from_num(56) };
-        
-        assert_eq!(Data::check_update(Some(&new), None), UpdateStatus::UpdateBothFull);
+        let new = Data {
+            temperature: I16F16::from_num(23.0),
+            humidity: I16F16::from_num(56),
+        };
+
+        assert_eq!(
+            Data::check_update(Some(&new), None),
+            UpdateStatus::UpdateBothFull
+        );
     }
 
     #[test]
     fn handle_some_to_none() {
-        let prev = Data { temperature: I16F16::from_num(23.0), humidity: I16F16::from_num(56) };
+        let prev = Data {
+            temperature: I16F16::from_num(23.0),
+            humidity: I16F16::from_num(56),
+        };
 
-        assert_eq!(Data::check_update(None, Some(&prev)), UpdateStatus::UpdateError);
+        assert_eq!(
+            Data::check_update(None, Some(&prev)),
+            UpdateStatus::UpdateError
+        );
     }
 }
