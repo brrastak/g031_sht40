@@ -6,7 +6,7 @@ use epd_waveshare::epd1in02::Epd1in02;
 use hal::{
     gpio::{
         Analog, Input, OpenDrain, Output, PA5, PA7, PB6, PB7, PullDown, PushPull, SignalEdge,
-        gpioa, gpioa::PA,
+        gpioa, gpioa::PA, gpiob::PB,
     },
     i2c::{Config, I2c},
     pac::{EXTI, I2C1, SPI1, TIM2, TIM3, TIM14, TIM16, TIM17},
@@ -50,7 +50,7 @@ pub struct Sensor {
 }
 
 pub struct Led {
-    led: InvertedPin<PA<Output<PushPull>>>,
+    led: PB<Output<PushPull>>,
     led_delay: Delay<TIM2>,
     pub exti: EXTI,
 }
@@ -76,7 +76,7 @@ impl Board {
 
         // Sht40 sensor
         let en_sensor = gpioa
-            .pa12
+            .pa0
             .into_open_drain_output_in_state(PinState::High)
             .downgrade();
         let en_sensor = InvertedPin::new(en_sensor);
@@ -88,14 +88,13 @@ impl Board {
         let extern_delay = periph.TIM3.delay(&mut rcc);
 
         // LED and button
-        let led_pin = gpioa
-            .pa4
-            .into_push_pull_output_in_state(PinState::High)
+        let led = gpiob
+            .pb9
+            .into_push_pull_output_in_state(PinState::Low)
             .downgrade();
-        let led = InvertedPin::new(led_pin);
         let led_delay = periph.TIM2.delay(&mut rcc);
         let mut exti = periph.EXTI;
-        let _button = gpioa.pa11.listen(SignalEdge::Rising, &mut exti);
+        let _button = gpioa.pa1.listen(SignalEdge::Rising, &mut exti);
 
         // RTC
         let date = Date::new(Year(0), Month(0), MonthDay(0));
@@ -114,11 +113,11 @@ impl Board {
 
         // Epd display
         let en_epd = gpioa
-            .pa0
+            .pa4
             .into_push_pull_output_in_state(PinState::High)
             .downgrade();
-        let epd_busy = gpioa.pa3.into_pull_down_input().downgrade();
-        let epd_reset = gpioa.pa2.into_push_pull_output().downgrade();
+        let epd_busy = gpioa.pa10.into_pull_down_input().downgrade();
+        let epd_reset = gpioa.pa9.into_push_pull_output().downgrade();
         let epd_dc = gpioa.pa8.into_push_pull_output().downgrade();
         let epd_cs = gpioa.pa6.into_push_pull_output().downgrade();
         let spi_clk = gpioa.pa5;
@@ -188,6 +187,6 @@ impl Led {
     }
 
     pub fn exti_unpend(&mut self) {
-        self.exti.unpend(hal::exti::Event::GPIO11);
+        self.exti.unpend(hal::exti::Event::GPIO1);
     }
 }

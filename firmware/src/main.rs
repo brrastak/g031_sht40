@@ -12,7 +12,7 @@ use stm32g0xx_hal as hal;
 use g031_sht40::bsp::{Board, Display, Led, Sensor};
 use g031_sht40::data::{Data, UpdateStatus};
 
-#[rtic::app(device = hal::pac, peripherals = true, dispatchers = [EXTI0_1])]
+#[rtic::app(device = hal::pac, peripherals = true, dispatchers = [EXTI4_15])]
 mod app {
 
     use super::*;
@@ -106,7 +106,7 @@ mod app {
 
     /// Turns on the LED for a short time when the button is pressed
     /// to indicate that the device is powered
-    #[task(binds = EXTI4_15, local = [led], priority = 2)]
+    #[task(binds = EXTI0_1, local = [led], priority = 2)]
     fn is_alive(cx: is_alive::Context) {
         let is_alive::LocalResources { led, .. } = cx.local;
 
