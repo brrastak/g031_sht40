@@ -3,9 +3,6 @@
 use fixed::types::*;
 
 
-/// Contains temperature and humidity
-// pub struct Data(Option<DataInner>);
-
 #[derive(Debug, PartialEq, Clone, Default)]
 pub struct Data {
     pub temperature: I16F16,
@@ -18,16 +15,12 @@ pub enum UpdateStatus {
     UpdateTemperature,
     UpdateHumidity,
     UpdateBoth,
-    // Error recovery
+    // Error recovery: clear screen before full update to remove error message
     UpdateBothFull,
     UpdateError,
 }
 
 impl Data {
-
-    // pub fn empty() -> Self {
-    //     Data(None)
-    // }
 
     pub fn from_sensor_measurement<Err>(measurement: Result<sht4x::Measurement, Err>) -> Option<Self> {
 
@@ -60,7 +53,7 @@ impl Data {
         }
 
         if prev.is_none() {
-            return UpdateStatus::UpdateBoth;
+            return UpdateStatus::UpdateBothFull;
         }
 
         let current = current.unwrap();
