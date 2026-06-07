@@ -8,7 +8,7 @@ use defmt;
 use defmt_rtt as _;
 use hal::rtc::{self, Rtc};
 use stm32g0xx_hal as hal;
-use panic_probe as _;
+use panic_halt as _;
 
 use g031_sht40::bsp::{Board, Display, Sensor, Led};
 use g031_sht40::data::{Data, UpdateStatus};

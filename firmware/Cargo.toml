@@ -15,6 +15,7 @@ epd-waveshare = "0.6.0"
 fixed = {version = "1.30.0", features = ["defmt"]}
 format_no_std = "1.2.0"
 inverted-pin = "1.0.0"
+panic-halt = "1.0.0"
 panic-probe = {version = "1.0.0", features = ["print-defmt"]}
 rtic = {version = "2.2.0", features = ["thumbv6-backend"]}
 sht4x = "0.2.0"
