@@ -16,7 +16,7 @@ use hal::{
 use stm32g0xx_hal as hal;
 use u8g2_fonts::{FontRenderer, fonts, types::*};
 
-use crate::{bsp::{Epd, EpdDelay, EpdSpiDev}, display::RenderTarget::Temperature};
+use crate::{bsp::{Epd, EpdDelay, EpdSpiDev}};
 use crate::data::{Data, UpdateStatus};
 use crate::deactivate::{ActivatedEpdPins, DeactivatedEpdPins};
 
@@ -44,7 +44,7 @@ const BOTH_LINES_Y: u32 = HUMIDITY_LINE_Y;
 /// Number of updates after which the screen will be fully cleared to prevent ghosting effect
 const CLEAR_NUMBER_OF_UPDATES: u32 = 100;
 
-enum RenderTarget {
+pub enum RenderTarget {
     Temperature,
     Humidity,
     Error,
@@ -59,7 +59,6 @@ pub struct Display {
     epd_delay: EpdDelay,
     /// For DeactivatedEpdPins
     pub rcc: rcc::Rcc,
-    // prev_frame: Frame,
     temperature_frame_buf: [u8; FRAME_SIZE],
     humidity_frame_buf: [u8; FRAME_SIZE],
     update_counter: u32,
@@ -110,7 +109,6 @@ impl Display {
             spi_dev,
             epd_delay,
             rcc,
-            // prev_frame: Frame::default(),
             temperature_frame_buf: [background_color; FRAME_SIZE],
             humidity_frame_buf: [background_color; FRAME_SIZE],
             update_counter: 0,
@@ -124,8 +122,9 @@ impl Display {
             return;
         }
 
-        let mut temperature_frame_buf = [0u8; FRAME_SIZE];
-        let mut humidity_frame_buf = [0u8; FRAME_SIZE];
+        let background_color = self.epd.background_color().get_byte_value();
+        let mut temperature_frame_buf = self.temperature_frame_buf;
+        let mut humidity_frame_buf = self.humidity_frame_buf;
 
         // Activate EPD
         let activated_pins = self.activate_pins();
@@ -140,8 +139,8 @@ impl Display {
             self.update_counter = 0;
         }
 
-        let mut update_frame = |prev_frame_buf: &mut [u8; FRAME_SIZE], target: RenderTarget| {
-            let mut new_frame_buf = [0u8; FRAME_SIZE];
+        let mut render_and_update = |prev_frame_buf: &mut [u8; FRAME_SIZE], target: RenderTarget| {
+            let mut new_frame_buf = [background_color; FRAME_SIZE];
             let new_frame = self.render_partial_frame(data, &mut new_frame_buf, &target);
             let y = match target {
                 RenderTarget::Temperature => TEMPERATURE_LINE_Y,
@@ -150,12 +149,20 @@ impl Display {
             };
             self.update_partial_frame(prev_frame_buf, new_frame, y);
             // Save buffer for the next update
-            *prev_frame_buf = new_frame_buf;
+            match target {
+                RenderTarget::Temperature => {
+                    self.temperature_frame_buf = new_frame_buf;
+                }
+                RenderTarget::Humidity => {
+                    self.humidity_frame_buf = new_frame_buf;
+                }
+                RenderTarget::Error => ()
+            }
         };
 
         match update_status {
             UpdateStatus::UpdateTemperature => {
-                update_frame(&mut temperature_frame_buf, RenderTarget::Temperature);
+                render_and_update(&mut temperature_frame_buf, RenderTarget::Temperature);
                 self.epd.display_partial_frame(
                     &mut self.spi_dev, 
                     &mut self.epd_delay, 
@@ -167,7 +174,7 @@ impl Display {
                     .expect("EPD error");
             }
             UpdateStatus::UpdateHumidity => {
-                update_frame(&mut humidity_frame_buf, RenderTarget::Humidity);
+                render_and_update(&mut humidity_frame_buf, RenderTarget::Humidity);
                 self.epd.display_partial_frame(
                     &mut self.spi_dev, 
                     &mut self.epd_delay, 
@@ -179,8 +186,8 @@ impl Display {
                     .expect("EPD error");
             }
             UpdateStatus::UpdateBoth | UpdateStatus::UpdateBothFull => {
-                update_frame(&mut temperature_frame_buf, RenderTarget::Temperature);
-                update_frame(&mut humidity_frame_buf, RenderTarget::Humidity);
+                render_and_update(&mut temperature_frame_buf, RenderTarget::Temperature);
+                render_and_update(&mut humidity_frame_buf, RenderTarget::Humidity);
                 self.epd.display_partial_frame(
                     &mut self.spi_dev, 
                     &mut self.epd_delay, 
@@ -192,7 +199,7 @@ impl Display {
                     .expect("EPD error");
             }
             UpdateStatus::UpdateError => {
-                update_frame(&mut [0u8; FRAME_SIZE], RenderTarget::Error);
+                render_and_update(&mut [background_color; FRAME_SIZE], RenderTarget::Error);
                 self.epd.display_partial_frame(
                     &mut self.spi_dev, 
                     &mut self.epd_delay, 
