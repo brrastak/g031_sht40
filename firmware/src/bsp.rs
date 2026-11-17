@@ -116,8 +116,8 @@ impl Board {
             .pa4
             .into_push_pull_output_in_state(PinState::High)
             .downgrade();
-        let epd_busy = gpioa.pa10.into_pull_down_input().downgrade();
-        let epd_reset = gpioa.pa9.into_push_pull_output().downgrade();
+        let epd_busy = gpioa.pa12.into_pull_down_input().downgrade();
+        let epd_reset = gpioa.pa11.into_push_pull_output().downgrade();
         let epd_dc = gpioa.pa8.into_push_pull_output().downgrade();
         let epd_cs = gpioa.pa6.into_push_pull_output().downgrade();
         let spi_clk = gpioa.pa5;
