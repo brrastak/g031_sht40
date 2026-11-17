@@ -136,6 +136,9 @@ impl Display {
             self.epd
                 .clear_frame(&mut self.spi_dev, &mut self.epd_delay)
                 .expect("EPD error");
+            self.epd
+                .display_frame(&mut self.spi_dev, &mut self.epd_delay)
+                .expect("EPD error");
             self.update_counter = 0;
         }
 
